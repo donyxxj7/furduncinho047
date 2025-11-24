@@ -1,0 +1,27 @@
+{
+  "version": "7",
+  "dialect": "mysql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "5",
+      "when": 1763348709705,
+      "tag": "0000_natural_champions",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "5",
+      "when": 1763348764265,
+      "tag": "0001_fair_dreaming_celestial",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1763392432273,
+      "tag": "0002_lush_wraith",
+      "breakpoints": true
+    }
+  ]
+}
