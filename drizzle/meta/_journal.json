@@ -22,6 +22,27 @@
       "when": 1763392432273,
       "tag": "0002_lush_wraith",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "5",
+      "when": 1764034774095,
+      "tag": "0003_powerful_retro_girl",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "5",
+      "when": 1765337405780,
+      "tag": "0004_cold_spacker_dave",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "5",
+      "when": 1765337483438,
+      "tag": "0005_plain_doorman",
+      "breakpoints": true
     }
   ]
 }

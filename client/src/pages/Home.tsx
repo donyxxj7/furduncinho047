@@ -106,12 +106,12 @@ export default function Home() {
               Furduncinho047
             </h2>
 
-            {/* --- NOVO TEXTO HERO --- */}
+            {/* --- TEXTO HERO ATUALIZADO (NEON) --- */}
             <p className="text-center text-[1.3rem] font-semibold tracking-wide text-purple-300 drop-shadow-[0_0_10px_#a020f0] animate-pulse mb-6 md:mb-8 px-4">
               O maior evento automotivo de 2026 tá chegando. Se prepara, porque
               a experiência vai ser pesada e inesquecível.
             </p>
-            {/* ----------------------- */}
+            {/* ------------------------------------ */}
 
             <div className="flex flex-wrap gap-4 justify-center">
               {isAuthenticated ? (
@@ -193,7 +193,7 @@ export default function Home() {
             </h3>
             <Card className="border-primary/20">
               <CardContent className="pt-6">
-                {/* --- NOVO TEXTO SOBRE --- */}
+                {/* --- TEXTO SOBRE ATUALIZADO (NEON) --- */}
                 <p className="leading-relaxed mb-4 text-gray-200 text-center font-semibold tracking-wide text-[1.15rem] drop-shadow-[0_0_10px_#a020f0]">
                   A{" "}
                   <span className="text-purple-400 drop-shadow-[0_0_8px_#b44bff] font-extrabold">
@@ -211,7 +211,7 @@ export default function Home() {
                     um dos maiores eventos automotivos de Santa Catarina.
                   </span>
                 </p>
-                {/* ------------------------ */}
+                {/* ----------------------------------- */}
               </CardContent>
             </Card>
           </div>
