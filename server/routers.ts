@@ -15,8 +15,8 @@ import { v2 as cloudinary } from "cloudinary";
 
 cloudinary.config({
   cloud_name: "dpp25ffrr",
-  api_key: "259293317835167",
-  api_secret: "QlIAoaDAz-7k-idnTqtzz_vYLAk",
+  api_key: "254826984242465",
+  api_secret: "KUfnjVudgrTGYDOaHFoj5oJgaBE",
 });
 
 function generateTicketCode(): string {

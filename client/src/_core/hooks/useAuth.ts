@@ -1,90 +1,61 @@
-// import { getLoginUrl } from "@/const"; // Removido
 import { trpc } from "@/lib/trpc";
-import { TRPCClientError } from "@trpc/client";
-import { useCallback, useEffect, useMemo } from "react";
+import { useLocation } from "wouter";
 
-type UseAuthOptions = {
-  redirectOnUnauthenticated?: boolean;
-  redirectPath?: string;
-};
-
-export function useAuth(options?: UseAuthOptions) {
-  // --- CORREÇÃO: O redirectPath agora aponta para o nosso /login ---
-  const { redirectOnUnauthenticated = false, redirectPath = "/login" } =
-    options ?? {};
+export function useAuth(options: { redirectOnUnauthenticated?: boolean } = {}) {
+  const [, setLocation] = useLocation();
   const utils = trpc.useUtils();
 
-  const meQuery = trpc.auth.me.useQuery(undefined, {
+  // Busca o usuário atual
+  const {
+    data: user,
+    isLoading,
+    error,
+  } = trpc.auth.me.useQuery(undefined, {
     retry: false,
-    refetchOnWindowFocus: false,
-
-    // Confia nos dados do cache (do setData no Login) por 5 minutos
-    // Isso impede a "condição de corrida" (race condition)
-    staleTime: 1000 * 60 * 5, // 5 minutos
   });
 
-  const logoutMutation = trpc.auth.logout.useMutation({
+  // Mutação de Login
+  const loginMutation = trpc.auth.login.useMutation({
     onSuccess: () => {
-      utils.auth.me.setData(undefined, null);
+      utils.auth.me.invalidate(); // Recarrega os dados do usuário
     },
   });
 
-  const logout = useCallback(async () => {
-    try {
-      await logoutMutation.mutateAsync();
-    } catch (error: unknown) {
-      if (
-        error instanceof TRPCClientError &&
-        error.data?.code === "UNAUTHORIZED"
-      ) {
-        return;
-      }
-      throw error;
-    } finally {
-      utils.auth.me.setData(undefined, null);
-      await utils.auth.me.invalidate();
+  // Mutação de Registro
+  const registerMutation = trpc.auth.register.useMutation({
+    onSuccess: () => {
+      utils.auth.me.invalidate();
+    },
+  });
+
+  // Mutação de Logout
+  const logoutMutation = trpc.auth.logout.useMutation({
+    onSuccess: () => {
+      utils.auth.me.invalidate();
+      setLocation("/login");
+    },
+  });
+
+  // Redirecionamento automático se não estiver logado
+  if (options.redirectOnUnauthenticated && !isLoading && !user) {
+    // Evita loop infinito se já estiver no login
+    if (
+      window.location.pathname !== "/login" &&
+      window.location.pathname !== "/register"
+    ) {
+      setLocation("/login");
     }
-  }, [logoutMutation, utils]);
-
-  const state = useMemo(() => {
-    localStorage.setItem(
-      "manus-runtime-user-info",
-      JSON.stringify(meQuery.data)
-    );
-    return {
-      user: meQuery.data ?? null,
-      loading: meQuery.isLoading || logoutMutation.isPending,
-      error: meQuery.error ?? logoutMutation.error ?? null,
-      isAuthenticated: Boolean(meQuery.data),
-    };
-  }, [
-    meQuery.data,
-    meQuery.error,
-    meQuery.isLoading,
-    logoutMutation.error,
-    logoutMutation.isPending,
-  ]);
-
-  useEffect(() => {
-    if (!redirectOnUnauthenticated) return;
-    if (meQuery.isLoading || logoutMutation.isPending) return;
-    if (state.user) return; // Se o usuário está no cache, não redireciona
-    if (typeof window === "undefined") return;
-    if (window.location.pathname === redirectPath) return;
-
-    // Redireciona para o /login (e não /app-auth)
-    window.location.href = redirectPath;
-  }, [
-    redirectOnUnauthenticated,
-    redirectPath,
-    logoutMutation.isPending,
-    meQuery.isLoading,
-    state.user,
-  ]);
+  }
 
   return {
-    ...state,
-    refresh: () => meQuery.refetch(),
-    logout,
+    user,
+    loading: isLoading || loginMutation.isPending || registerMutation.isPending,
+    isAuthenticated: !!user,
+    // Expõe as funções para as páginas usarem
+    login: (email: string, password: string) =>
+      loginMutation.mutateAsync({ email, password }),
+    register: (name: string, email: string, password: string) =>
+      registerMutation.mutateAsync({ name, email, password }),
+    logout: () => logoutMutation.mutateAsync(),
   };
 }

@@ -1,36 +1,39 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { APP_LOGO } from "@/const";
 import { trpc } from "@/lib/trpc";
-import { ArrowLeft, Upload, CheckCircle2, Phone } from "lucide-react";
-import { useState } from "react";
-import { Link, useLocation, useParams } from "wouter";
+import {
+  ArrowLeft,
+  UploadCloud,
+  FileImage,
+  X,
+  CheckCircle2,
+  Loader2,
+  AlertCircle,
+} from "lucide-react";
+import { useState, useRef } from "react";
+import { Link, useLocation, useRoute } from "wouter";
 import { toast } from "sonner";
 
 export default function SubmitProof() {
-  const { ticketId } = useParams<{ ticketId: string }>();
-  const { isAuthenticated } = useAuth();
+  const { user, isAuthenticated } = useAuth({
+    redirectOnUnauthenticated: true,
+  });
+  const [, params] = useRoute("/enviar-comprovante/:ticketId");
+  const ticketId = params?.ticketId ? parseInt(params.ticketId) : 0;
   const [, setLocation] = useLocation();
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [preview, setPreview] = useState<string>("");
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Busca dados do ingresso para mostrar no topo
   const { data: ticket, isLoading } = trpc.tickets.getById.useQuery(
-    { id: Number(ticketId) },
-    { enabled: isAuthenticated && !!ticketId }
-  );
-
-  const { data: payment } = trpc.payments.getByTicket.useQuery(
-    { ticketId: Number(ticketId) },
-    { enabled: isAuthenticated && !!ticketId }
+    { id: ticketId },
+    {
+      enabled: !!ticketId && isAuthenticated,
+    }
   );
 
   const submitProofMutation = trpc.payments.submitProof.useMutation({
@@ -38,327 +41,199 @@ export default function SubmitProof() {
       toast.success("Comprovante enviado com sucesso!");
       setLocation("/meus-ingressos");
     },
-    onError: error => {
-      toast.error(error.message || "Erro ao enviar comprovante");
-    },
+    onError: error =>
+      toast.error(error.message || "Erro ao enviar comprovante"),
   });
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
+        // 5MB limit
         toast.error("O arquivo deve ter no máximo 5MB");
         return;
       }
-
-      if (!file.type.startsWith("image/")) {
-        toast.error("Apenas imagens são permitidas");
-        return;
-      }
-
       setSelectedFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      const url = URL.createObjectURL(file);
+      setPreviewUrl(url);
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!selectedFile) {
-      toast.error("Selecione um arquivo");
-      return;
-    }
+  const handleSubmit = async () => {
+    if (!selectedFile) return;
 
     const reader = new FileReader();
     reader.onloadend = () => {
-      const base64 = (reader.result as string).split(",")[1];
+      const base64String = reader.result as string;
+      // Remove o prefixo "data:image/xyz;base64," para enviar só os dados
+      const base64Data = base64String.split(",")[1];
+
       submitProofMutation.mutate({
-        ticketId: Number(ticketId),
-        proofData: base64,
+        ticketId,
+        proofData: base64Data,
         proofMimeType: selectedFile.type,
       });
     };
     reader.readAsDataURL(selectedFile);
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  const clearFile = () => {
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+  };
 
-  if (!ticket) {
+  if (isLoading)
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Card className="max-w-md w-full mx-4">
-          <CardHeader>
-            <CardTitle>Ingresso não encontrado</CardTitle>
-            <CardDescription>
-              O ingresso solicitado não foi encontrado.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/">
-              <Button className="w-full">Voltar para Home</Button>
-            </Link>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <Loader2 className="animate-spin text-purple-500 h-10 w-10" />
       </div>
     );
-  }
 
-  if (ticket.status === "paid") {
+  if (!ticket)
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Card className="max-w-md w-full mx-4 border-primary/20">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CheckCircle2 className="h-6 w-6 text-primary" />
-              Pagamento Aprovado
-            </CardTitle>
-            <CardDescription>Seu ingresso já foi aprovado!</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Link href="/meus-ingressos">
-              <Button className="w-full">Ver Meu Ingresso</Button>
-            </Link>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-black text-white flex items-center justify-center">
+        Ingresso não encontrado.
       </div>
     );
-  }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border/50 backdrop-blur-sm bg-background/80 sticky top-0 z-50">
+    <div className="min-h-screen bg-black text-white relative overflow-hidden">
+      {/* Luzes de Fundo */}
+      <div className="fixed inset-0 z-0 pointer-events-none">
+        <div className="absolute top-[-10%] left-[50%] -translate-x-1/2 w-[600px] h-[600px] bg-purple-900/10 blur-[120px] rounded-full"></div>
+      </div>
+
+      <header className="border-b border-white/10 bg-black/50 backdrop-blur-md sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/meus-ingressos">
-            <Button variant="ghost" size="sm">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-gray-400 hover:text-white"
+            >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Voltar
             </Button>
           </Link>
-          <div className="flex items-center gap-3">
-            <img
-              src={APP_LOGO}
-              alt="Furduncinho047"
-              className="h-10 w-10 rounded-full"
-            />
-            <h1 className="text-xl font-bold text-primary">Furduncinho047</h1>
+          <div className="flex items-center gap-2">
+            <img src={APP_LOGO} className="h-8 w-8 rounded-full" />
+            <span className="font-bold hidden md:inline">
+              Envio de Comprovante
+            </span>
           </div>
           <div className="w-20"></div>
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-12">
-        <div className="max-w-2xl mx-auto">
-          <h2 className="text-3xl font-bold mb-8 text-center">
-            Enviar Comprovante
-          </h2>
-
-          <Card className="border-primary/20 mb-6">
-            <CardHeader>
-              <CardTitle>Informações do Pedido</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">
-                    Código do Pedido:
-                  </span>
-                  <span className="font-semibold">#{ticket.id}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Valor:</span>
-                  <span className="font-semibold text-primary">R$ 25,00</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Status:</span>
-                  <span className="font-semibold">
-                    {payment?.status === "pending" && "Aguardando Aprovação"}
-                    {payment?.status === "rejected" && "Rejeitado"}
-                    {!payment && "Aguardando Comprovante"}
-                  </span>
-                </div>
+      <div className="container mx-auto px-4 py-8 relative z-10 flex flex-col items-center">
+        <div className="w-full max-w-md space-y-6">
+          {/* Card de Informação do Pedido */}
+          <Card className="bg-white/5 border-white/10 backdrop-blur-md">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-wider">
+                  Pedido
+                </p>
+                <p className="text-2xl font-mono font-bold text-purple-400">
+                  #{ticketId}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-gray-400 uppercase tracking-wider">
+                  Valor
+                </p>
+                <p className="text-xl font-bold text-white">R$ 25,00</p>
               </div>
             </CardContent>
           </Card>
 
-          {payment?.status === "rejected" && payment.rejectionReason && (
-            <Card className="border-destructive/50 bg-destructive/5 mb-6">
-              <CardHeader>
-                <CardTitle className="text-destructive">
-                  Comprovante Rejeitado
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-muted-foreground">
-                  <strong>Motivo:</strong> {payment.rejectionReason}
+          {/* Área Principal de Upload */}
+          <div className="bg-black/40 border border-dashed border-purple-500/30 rounded-2xl p-8 text-center hover:border-purple-500/60 transition-colors relative group">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileSelect}
+              accept="image/*"
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+              disabled={!!selectedFile}
+            />
+
+            {!selectedFile ? (
+              <div className="flex flex-col items-center gap-4 py-8">
+                <div className="h-20 w-20 bg-purple-500/10 rounded-full flex items-center justify-center group-hover:bg-purple-500/20 transition-all border border-purple-500/20 group-hover:scale-110 duration-300">
+                  <UploadCloud className="h-10 w-10 text-purple-400" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-lg font-bold text-white">
+                    Toque para selecionar
+                  </h3>
+                  <p className="text-sm text-gray-400">
+                    ou arraste o comprovante aqui
+                  </p>
+                </div>
+                <p className="text-xs text-gray-600">
+                  Formatos: JPG, PNG, PDF (Máx 5MB)
                 </p>
-                <p className="text-sm text-muted-foreground mt-2">
-                  Por favor, envie um novo comprovante válido.
-                </p>
-              </CardContent>
-            </Card>
+              </div>
+            ) : (
+              <div className="relative z-30">
+                <div className="relative rounded-xl overflow-hidden border border-white/20 shadow-2xl mx-auto max-h-[300px]">
+                  <img
+                    src={previewUrl!}
+                    alt="Preview"
+                    className="w-full h-full object-contain bg-black/50"
+                  />
+                  <Button
+                    size="icon"
+                    variant="destructive"
+                    className="absolute top-2 right-2 rounded-full h-8 w-8 shadow-lg"
+                    onClick={clearFile}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+                <div className="flex items-center justify-center gap-2 mt-4 text-green-400">
+                  <CheckCircle2 className="h-5 w-5" />
+                  <span className="font-semibold text-sm">
+                    Imagem carregada
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Instruções */}
+          {!selectedFile && (
+            <div className="flex gap-3 bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl items-start">
+              <AlertCircle className="h-5 w-5 text-blue-400 shrink-0 mt-0.5" />
+              <div className="text-sm text-gray-300">
+                <p className="font-bold text-blue-300 mb-1">Importante:</p>
+                Certifique-se de que o comprovante mostre claramente a{" "}
+                <strong>data</strong>, o <strong>valor</strong> e o{" "}
+                <strong>destinatário</strong> do PIX.
+              </div>
+            </div>
           )}
 
-          <Card className="border-primary/20 mb-6">
-            <CardHeader>
-              <CardTitle>Dados para Pagamento</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="bg-muted/50 p-4 rounded-lg">
-                  <h4 className="font-semibold mb-2">PIX</h4>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Nome:</span>
-                      <span className="font-medium">
-                        Endony Paradela Rodrigues
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Banco:</span>
-                      <span className="font-medium">Mercado Pago</span>
-                    </div>
-                    <div className="flex flex-col gap-1 mt-3">
-                      <span className="text-muted-foreground">
-                        Chave PIX (Celular):
-                      </span>
-                      {/* --- CHAVE PIX ATUALIZADA --- */}
-                      <code className="bg-background p-2 rounded text-lg font-bold text-center break-all select-all cursor-text">
-                        47997051529
-                      </code>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex justify-center">
-                  <img
-                    src="/qr-payment.jpg"
-                    alt="QR Code para pagamento"
-                    className="max-w-xs w-full rounded-lg border border-border"
-                  />
-                </div>
+          {/* Botão de Envio */}
+          <Button
+            className={`w-full h-14 text-lg font-bold rounded-xl transition-all ${
+              selectedFile
+                ? "bg-purple-600 hover:bg-purple-500 text-white shadow-[0_0_30px_rgba(147,51,234,0.4)]"
+                : "bg-white/10 text-gray-500 cursor-not-allowed"
+            }`}
+            onClick={handleSubmit}
+            disabled={!selectedFile || submitProofMutation.isPending}
+          >
+            {submitProofMutation.isPending ? (
+              <div className="flex items-center gap-2">
+                <Loader2 className="animate-spin h-5 w-5" /> Enviando...
               </div>
-            </CardContent>
-          </Card>
-
-          {/* --- CARD DE CONTATOS ADICIONADO --- */}
-          <Card className="border-primary/20 mb-6">
-            <CardHeader>
-              <CardTitle>Dúvidas ou Envio Rápido?</CardTitle>
-              <CardDescription>
-                Você também pode enviar o comprovante diretamente para um dos
-                administradores via WhatsApp:
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <Button
-                asChild
-                variant="outline"
-                className="w-full justify-start gap-3 text-left h-auto"
-              >
-                <a
-                  href="https://wa.me/5547992618136"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Phone className="h-4 w-4 shrink-0" />
-                  (47) 99261-8136 — Ruan
-                </a>
-              </Button>
-              <Button
-                asChild
-                variant="outline"
-                className="w-full justify-start gap-3 text-left h-auto"
-              >
-                <a
-                  href="https://wa.me/5547996979192"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Phone className="h-4 w-4 shrink-0" />
-                  (47) 99697-9192 — Rosario
-                </a>
-              </Button>
-              <Button
-                asChild
-                variant="outline"
-                className="w-full justify-start gap-3 text-left h-auto"
-              >
-                <a
-                  href="https://wa.me/5547999590746"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <Phone className="h-4 w-4 shrink-0" />
-                  (47) 99959-0746 — Gaba
-                </a>
-              </Button>
-            </CardContent>
-          </Card>
-          {/* ----------------------------------- */}
-
-          <Card className="border-primary/20">
-            <CardHeader>
-              <CardTitle>Upload do Comprovante</CardTitle>
-              <CardDescription>
-                Envie uma foto ou print do comprovante de pagamento via PIX
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                  <Label htmlFor="proof">Comprovante (máx. 5MB)</Label>
-                  <Input
-                    id="proof"
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileChange}
-                    className="mt-2"
-                  />
-                </div>
-
-                {preview && (
-                  <div className="mt-4">
-                    <Label>Preview:</Label>
-                    <img
-                      src={preview}
-                      alt="Preview do comprovante"
-                      className="mt-2 max-w-full h-auto rounded-lg border border-border"
-                    />
-                  </div>
-                )}
-
-                <Button
-                  type="submit"
-                  className="w-full"
-                  size="lg"
-                  disabled={!selectedFile || submitProofMutation.isPending}
-                >
-                  {submitProofMutation.isPending ? (
-                    <>
-                      <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-white mr-2"></div>
-                      Enviando...
-                    </>
-                  ) : (
-                    <>
-                      <Upload className="mr-2 h-5 w-5" />
-                      Enviar Comprovante
-                    </>
-                  )}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
+            ) : (
+              "ENVIAR COMPROVANTE AGORA"
+            )}
+          </Button>
         </div>
       </div>
     </div>
