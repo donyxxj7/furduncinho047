@@ -6,10 +6,9 @@ import superjson from "superjson";
 export const trpc = createTRPCReact<AppRouter>();
 
 export const trpcClient = trpc.createClient({
+  transformer: superjson, // <-- Agora fica AQUI, não dentro do link
   links: [
     httpBatchLink({
-      transformer: superjson,
-      // TEM QUE SER O LINK COMPLETO DO RENDER:
       url: "https://furduncinho047.onrender.com/api/trpc",
       async headers() {
         return {};
