@@ -8,11 +8,12 @@ export const trpc = createTRPCReact<AppRouter>();
 export const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
-      transformer: superjson, // O transformer fica AQUI no cliente
+      transformer: superjson,
 
-      url: import.meta.env.VITE_API_URL
-        ? `${import.meta.env.VITE_API_URL}/api/trpc`
-        : "http://localhost:3000/api/trpc",
+      // --- CORREÇÃO FINAL: LINK DIRETO ---
+      // Forçamos o site a sempre olhar para o servidor do Render
+      url: "https://furduncinho047.onrender.com/api/trpc",
+      // ----------------------------------
 
       async headers() {
         return {};
