@@ -27,11 +27,18 @@ import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import { useState } from "react";
 
+// --- ⚠️ ÁREA DE EDIÇÃO DO PIX (ALTERE AQUI QUANDO TIVER A CONTA NOVA) ---
+const PIX_INFO = {
+  chave: "47997051529", // <--- Coloque a nova chave aqui
+  nome: "Endony Paradela Rodrigues", // <--- Nome do novo titular
+  banco: "Mercado Pago", // <--- Banco da conta nova
+};
+// -----------------------------------------------------------------------
+
 export default function BuyTicket() {
   const { user, loading: authLoading, isAuthenticated } = useAuth();
   const [, setLocation] = useLocation();
 
-  // Estado para controlar o Modal de Sucesso
   const [createdTicketId, setCreatedTicketId] = useState<number | null>(null);
   const [isSuccessOpen, setIsSuccessOpen] = useState(false);
 
@@ -50,16 +57,14 @@ export default function BuyTicket() {
   });
 
   const handleCopyPix = () => {
-    navigator.clipboard.writeText("47997051529");
+    navigator.clipboard.writeText(PIX_INFO.chave);
     toast.success("Chave PIX copiada!");
   };
 
-  // --- MENSAGEM DO WHATSAPP ATUALIZADA (SÓ O ID) ---
   const getWhatsAppLink = (phone: string, id: number) => {
     const text = `Olá, segue o ID do meu pagamento para o Furduncinho047: Pedido #${id}`;
     return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
   };
-  // ------------------------------------------------
 
   if (authLoading || ticketsLoading)
     return (
@@ -97,7 +102,6 @@ export default function BuyTicket() {
 
   return (
     <div className="min-h-screen bg-black text-white relative overflow-hidden">
-      {/* Luzes de Fundo */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <div className="absolute top-[20%] right-[20%] w-[400px] h-[400px] bg-purple-900/20 blur-[120px] rounded-full mix-blend-screen animate-pulse"></div>
       </div>
@@ -156,7 +160,6 @@ export default function BuyTicket() {
             </Card>
           ) : (
             <>
-              {/* Resumo */}
               <Card className="bg-white/5 border-white/10 backdrop-blur-xl mb-6 text-white">
                 <CardHeader>
                   <CardTitle className="text-purple-300">
@@ -180,34 +183,31 @@ export default function BuyTicket() {
                 </CardContent>
               </Card>
 
-              {/* Área do PIX */}
               <Card className="bg-white/5 border-white/10 backdrop-blur-xl mb-6 text-white relative overflow-hidden">
-                {/* Efeito Glow na borda */}
                 <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-600 to-blue-600"></div>
-
                 <CardHeader>
                   <CardTitle>Pagamento via PIX</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-6">
                   <div className="bg-black/40 p-6 rounded-xl border border-purple-500/30 text-center">
                     <p className="text-sm text-gray-400 mb-2 uppercase tracking-widest font-semibold">
-                      Chave PIX (Celular)
+                      Chave PIX (Celular/Aleatória)
                     </p>
                     <div className="flex items-center gap-2 justify-center mb-2">
-                      <code className="text-2xl md:text-3xl font-mono font-bold text-white select-all">
-                        47997051529
+                      <code className="text-2xl md:text-3xl font-mono font-bold text-white select-all break-all">
+                        {PIX_INFO.chave}
                       </code>
                       <Button
                         size="icon"
                         variant="secondary"
                         onClick={handleCopyPix}
-                        className="h-10 w-10 rounded-full bg-purple-600 hover:bg-purple-500 text-white border-0"
+                        className="h-10 w-10 shrink-0 rounded-full bg-purple-600 hover:bg-purple-500 text-white border-0"
                       >
                         <Copy className="h-5 w-5" />
                       </Button>
                     </div>
                     <p className="text-xs text-purple-300">
-                      Endony Paradela Rodrigues • Mercado Pago
+                      {PIX_INFO.nome} • {PIX_INFO.banco}
                     </p>
                   </div>
 
@@ -237,9 +237,7 @@ export default function BuyTicket() {
         </div>
       </div>
 
-      {/* --- MODAL RESPONSIVO CORRIGIDO --- */}
       <Dialog open={isSuccessOpen} onOpenChange={setIsSuccessOpen}>
-        {/* Adicionado: w-[95%], max-h-[85vh], overflow-y-auto */}
         <DialogContent className="bg-black/90 border border-purple-500/50 text-white backdrop-blur-xl w-[95%] rounded-2xl max-h-[90vh] overflow-y-auto sm:max-w-md">
           <DialogHeader className="text-center pt-4">
             <div className="mx-auto mb-4 bg-green-500/20 p-4 rounded-full w-fit border border-green-500/50">
@@ -309,11 +307,8 @@ export default function BuyTicket() {
               </Button>
             </div>
 
-            {/* --- SEPARADOR SEM TEXTO --- */}
             <div className="w-full border-t border-white/10 my-2"></div>
-            {/* --------------------------- */}
 
-            {/* BOTÃO AGORA LEVA PARA /meus-ingressos */}
             <Button
               onClick={() =>
                 setLocation(`/enviar-comprovante/${createdTicketId}`)
