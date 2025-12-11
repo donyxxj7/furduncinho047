@@ -22,18 +22,18 @@ import {
   Copy,
   UploadCloud,
   MessageCircle,
+  Download,
+  Maximize2,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
 import { useState } from "react";
 
-// --- ⚠️ ÁREA DE EDIÇÃO DO PIX (ALTERE AQUI QUANDO TIVER A CONTA NOVA) ---
 const PIX_INFO = {
-  chave: "47997051529", // <--- Coloque a nova chave aqui
-  nome: "Endony Paradela Rodrigues", // <--- Nome do novo titular
-  banco: "Mercado Pago", // <--- Banco da conta nova
+  chave: "47997051529",
+  nome: "Endony Paradela Rodrigues",
+  banco: "Mercado Pago",
 };
-// -----------------------------------------------------------------------
 
 export default function BuyTicket() {
   const { user, loading: authLoading, isAuthenticated } = useAuth();
@@ -59,6 +59,16 @@ export default function BuyTicket() {
   const handleCopyPix = () => {
     navigator.clipboard.writeText(PIX_INFO.chave);
     toast.success("Chave PIX copiada!");
+  };
+
+  const handleDownloadQR = () => {
+    const link = document.createElement("a");
+    link.href = "/qr-payment.jpg";
+    link.download = "furduncinho-pix-qr.jpg";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    toast.success("QR Code baixado!");
   };
 
   const getWhatsAppLink = (phone: string, id: number) => {
@@ -191,7 +201,7 @@ export default function BuyTicket() {
                 <CardContent className="space-y-6">
                   <div className="bg-black/40 p-6 rounded-xl border border-purple-500/30 text-center">
                     <p className="text-sm text-gray-400 mb-2 uppercase tracking-widest font-semibold">
-                      Chave PIX (Celular/Aleatória)
+                      Chave PIX (Celular)
                     </p>
                     <div className="flex items-center gap-2 justify-center mb-2">
                       <code className="text-2xl md:text-3xl font-mono font-bold text-white select-all break-all">
@@ -211,13 +221,40 @@ export default function BuyTicket() {
                     </p>
                   </div>
 
-                  <div className="flex justify-center">
-                    <div className="p-3 bg-white rounded-xl shadow-lg">
-                      <img
-                        src="/qr-payment.jpg"
-                        alt="QR Code"
-                        className="max-w-[180px] rounded"
-                      />
+                  <div className="flex flex-col items-center gap-4">
+                    <div className="relative group">
+                      <div
+                        className="p-3 bg-white rounded-xl shadow-lg cursor-pointer transition-transform hover:scale-105"
+                        onClick={() => window.open("/qr-payment.jpg", "_blank")}
+                      >
+                        <img
+                          src="/qr-payment.jpg"
+                          alt="QR Code"
+                          className="max-w-[180px] rounded"
+                        />
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center rounded-xl transition-opacity">
+                          <Maximize2 className="text-white h-8 w-8" />
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex gap-2 w-full justify-center">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleDownloadQR}
+                        className="border-white/20 text-gray-300 hover:text-white hover:bg-white/10"
+                      >
+                        <Download className="mr-2 h-4 w-4" /> Baixar Imagem
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open("/qr-payment.jpg", "_blank")}
+                        className="border-white/20 text-gray-300 hover:text-white hover:bg-white/10"
+                      >
+                        <Maximize2 className="mr-2 h-4 w-4" /> Ampliar
+                      </Button>
                     </div>
                   </div>
                 </CardContent>
@@ -307,6 +344,7 @@ export default function BuyTicket() {
               </Button>
             </div>
 
+            {/* AQUI NÃO TEM MAIS O "OU" */}
             <div className="w-full border-t border-white/10 my-2"></div>
 
             <Button
