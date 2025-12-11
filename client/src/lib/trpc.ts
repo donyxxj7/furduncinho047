@@ -9,12 +9,8 @@ export const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
       transformer: superjson,
-
-      // --- CORREÇÃO FINAL: LINK DIRETO ---
-      // Forçamos o site a sempre olhar para o servidor do Render
+      // TEM QUE SER O LINK COMPLETO DO RENDER:
       url: "https://furduncinho047.onrender.com/api/trpc",
-      // ----------------------------------
-
       async headers() {
         return {};
       },
