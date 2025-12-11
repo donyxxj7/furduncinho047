@@ -1,5 +1,6 @@
 import "dotenv/config";
 import express from "express";
+import cors from "cors"; // <--- IMPORTANTE: Adicionado
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
@@ -11,7 +12,6 @@ import * as db from "../db";
 import { sql } from "drizzle-orm";
 
 // --- CONFIGURAÇÃO DO AUTO-PING ---
-// O Render fornece a URL automaticamente na variável RENDER_EXTERNAL_URL
 const MY_RENDER_URL =
   process.env.RENDER_EXTERNAL_URL || "http://localhost:3000";
 // ---------------------------------
@@ -37,11 +37,10 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
 
 // --- FUNÇÃO KEEP-ALIVE DUPLA (Banco + Servidor) ---
 function startKeepAlive() {
-  // Roda a cada 14 minutos (Render dorme em 15min)
-  const INTERVAL_MS = 14 * 60 * 1000;
+  const INTERVAL_MS = 14 * 60 * 1000; // 14 minutos
 
   setInterval(async () => {
-    // 1. Ping no Banco de Dados (Para o TiDB não dormir)
+    // 1. Ping no Banco de Dados
     try {
       const database = await db.getDb();
       if (database) {
@@ -52,13 +51,11 @@ function startKeepAlive() {
       console.error("❌ [KeepAlive] Erro ao pingar banco:", error);
     }
 
-    // 2. Ping no Servidor Web (Para o Render não dormir)
-    // Só faz sentido se estivermos em produção no Render
+    // 2. Ping no Servidor Web (Auto-Ping)
     if (process.env.RENDER_EXTERNAL_URL) {
       try {
-        // Acessa a rota de "me" (leve) para acordar a API
         console.log(`⏰ [KeepAlive] Pingando ${MY_RENDER_URL}...`);
-        const response = await fetch(`${MY_RENDER_URL}/api/trpc/auth.me`);
+        const response = await fetch(`${MY_RENDER_URL}/api/trpc/system.health`); // Rota leve de health check
         console.log(`✅ [KeepAlive] Status do Ping: ${response.status}`);
       } catch (error) {
         console.error("❌ [KeepAlive] Erro no Self-Ping:", error);
@@ -71,6 +68,21 @@ function startKeepAlive() {
 async function startServer() {
   const app = express();
   const server = createServer(app);
+
+  // --- CONFIGURAÇÃO DO CORS (Obrigatório para Vercel) ---
+  app.use(
+    cors({
+      origin: [
+        "http://localhost:5173", // Frontend local
+        "http://localhost:3000", // Backend local
+        "https://furduncinho047.vercel.app", // SEU SITE NA VERCEL
+      ],
+      credentials: true,
+      methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization"],
+    })
+  );
+  // ----------------------------------------------------
 
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
@@ -100,9 +112,8 @@ async function startServer() {
 
   server.listen(port, "0.0.0.0", () => {
     console.log(`Server running on port ${port}`);
-
-    // Inicia o sistema anti-sono
     console.log("☕ Sistema Anti-Sleep (DB + HTTP): ATIVADO");
+    console.log("🔓 CORS habilitado para Vercel e Localhost");
     startKeepAlive();
   });
 }

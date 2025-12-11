@@ -1,29 +1,54 @@
-import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
-import type { User } from "../../drizzle/schema";
-import { sdk } from "./sdk";
+import { type CreateExpressContextOptions } from "@trpc/server/adapters/express";
+import { getDb } from "../db";
+import jwt from "jsonwebtoken";
+// --- CORREÇÃO AQUI: Voltamos DUAS pastas (../..) para achar o drizzle na raiz ---
+import { users } from "../../drizzle/schema";
+import { eq } from "drizzle-orm";
 
-export type TrpcContext = {
-  req: CreateExpressContextOptions["req"];
-  res: CreateExpressContextOptions["res"];
-  user: User | null;
-};
-
-export async function createContext(
-  opts: CreateExpressContextOptions
-): Promise<TrpcContext> {
-  let user: User | null = null;
-
+async function getUserFromHeader(req: CreateExpressContextOptions["req"]) {
   try {
-    // Agora isso vai rodar nossa lógica de 'authenticateRequest' modificada
-    user = await sdk.authenticateRequest(opts.req);
-  } catch (error) {
-    // A autenticação é opcional para rotas públicas (como login/register)
-    user = null;
+    const authHeader = req.headers.authorization;
+    if (!authHeader) return null;
+
+    const token = authHeader.split(" ")[1];
+    if (!token) return null;
+
+    if (!process.env.JWT_SECRET) return null;
+
+    const decoded: any = jwt.verify(token, process.env.JWT_SECRET);
+    if (!decoded || !decoded.userId) return null;
+
+    const db = await getDb();
+
+    // Verificação de segurança
+    if (!db) return null;
+
+    // Busca o usuário
+    const result = await db
+      .select()
+      .from(users)
+      .where(eq(users.id, decoded.userId))
+      .limit(1);
+
+    return result[0] || null;
+  } catch (err) {
+    return null;
   }
+}
+
+export const createContext = async ({
+  req,
+  res,
+}: CreateExpressContextOptions) => {
+  const db = await getDb();
+  const user = await getUserFromHeader(req);
 
   return {
-    req: opts.req,
-    res: opts.res,
+    req,
+    res,
+    db,
     user,
   };
-}
+};
+
+export type Context = Awaited<ReturnType<typeof createContext>>;
