@@ -14,6 +14,7 @@ import AdminPayments from "./pages/AdminPayments";
 import AdminScanner from "./pages/AdminScanner";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import AdminSettings from "./pages/AdminSettings";
 
 function Router() {
   return (
@@ -30,6 +31,7 @@ function Router() {
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/admin/pagamentos" component={AdminPayments} />
       <Route path="/admin/scanner" component={AdminScanner} />
+      <Route path="/admin/configuracoes" component={AdminSettings} />
 
       <Route path="/404" component={NotFound} />
       <Route component={NotFound} />

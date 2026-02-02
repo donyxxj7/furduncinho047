@@ -27,7 +27,7 @@ export default function SubmitProof() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Busca dados do ingresso para mostrar o valor real do banco
+  // 1. BUSCA OS DADOS DO INGRESSO (O valor 'amount' já vem somado do banco)
   const { data: ticket, isLoading } = trpc.tickets.getById.useQuery(
     { id: ticketId },
     {
@@ -114,7 +114,7 @@ export default function SubmitProof() {
           </Link>
           <div className="flex items-center gap-2">
             <img src={APP_LOGO} className="h-8 w-8 rounded-full" />
-            <span className="font-bold hidden md:inline">
+            <span className="font-bold hidden md:inline uppercase tracking-widest text-sm">
               Envio de Comprovante
             </span>
           </div>
@@ -125,9 +125,9 @@ export default function SubmitProof() {
       <div className="container mx-auto px-4 py-8 relative z-10 flex flex-col items-center">
         <div className="w-full max-w-md space-y-6">
           <Card className="bg-white/5 border-white/10 backdrop-blur-md">
-            <CardContent className="p-4 flex items-center justify-between">
+            <CardContent className="p-6 flex items-center justify-between">
               <div>
-                <p className="text-xs text-gray-400 uppercase tracking-wider">
+                <p className="text-xs text-gray-500 uppercase tracking-widest mb-1">
                   Pedido
                 </p>
                 <p className="text-2xl font-mono font-bold text-purple-400">
@@ -135,11 +135,11 @@ export default function SubmitProof() {
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-xs text-gray-400 uppercase tracking-wider">
-                  Valor
+                <p className="text-xs text-gray-500 uppercase tracking-widest mb-1">
+                  Valor Total
                 </p>
-                {/* VALOR DINÂMICO AQUI */}
-                <p className="text-xl font-bold text-white">
+                {/* 2. FORMATAÇÃO DINÂMICA DO VALOR SALVO NO BANCO */}
+                <p className="text-2xl font-black text-white">
                   {(ticket.amount / 100).toLocaleString("pt-BR", {
                     style: "currency",
                     currency: "BRL",
@@ -195,8 +195,8 @@ export default function SubmitProof() {
                 </div>
                 <div className="flex items-center justify-center gap-2 mt-4 text-green-400">
                   <CheckCircle2 className="h-5 w-5" />
-                  <span className="font-semibold text-sm">
-                    Imagem carregada
+                  <span className="font-semibold text-sm text-green-400">
+                    Imagem carregada com sucesso
                   </span>
                 </div>
               </div>
@@ -207,7 +207,9 @@ export default function SubmitProof() {
             <div className="flex gap-3 bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl items-start">
               <AlertCircle className="h-5 w-5 text-blue-400 shrink-0 mt-0.5" />
               <div className="text-sm text-gray-300">
-                <p className="font-bold text-blue-300 mb-1">Importante:</p>
+                <p className="font-bold text-blue-300 mb-1 tracking-tight">
+                  Importante:
+                </p>
                 Certifique-se de que o comprovante mostre claramente a{" "}
                 <strong>data</strong>, o <strong>valor</strong> e o{" "}
                 <strong>destinatário</strong> do PIX.
@@ -218,7 +220,7 @@ export default function SubmitProof() {
           <Button
             className={`w-full h-14 text-lg font-bold rounded-xl transition-all ${
               selectedFile
-                ? "bg-purple-600 hover:bg-purple-500 text-white shadow-[0_0_30px_rgba(147,51,234,0.4)]"
+                ? "bg-purple-600 hover:bg-purple-500 text-white shadow-[0_0_30px_rgba(147,51,234,0.4)] hover:scale-[1.02]"
                 : "bg-white/10 text-gray-500 cursor-not-allowed"
             }`}
             onClick={handleSubmit}

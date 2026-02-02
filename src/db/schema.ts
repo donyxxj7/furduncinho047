@@ -8,13 +8,16 @@ import {
   varchar,
 } from "drizzle-orm/pg-core";
 
+// --- ENUMS ---
 export const roleEnum = pgEnum("role", ["user", "admin"]);
+
 export const ticketStatusEnum = pgEnum("status", [
   "pending",
   "paid",
   "cancelled",
   "used",
 ]);
+
 export const paymentStatusEnum = pgEnum("payment_status", [
   "pending",
   "completed",
@@ -24,6 +27,7 @@ export const paymentStatusEnum = pgEnum("payment_status", [
   "rejected",
 ]);
 
+// --- TABELA: USUÁRIOS ---
 export const users = pgTable("users", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   openid: varchar("openid", { length: 64 }).notNull().unique(),
@@ -41,15 +45,14 @@ export const users = pgTable("users", {
   lastSignedIn: timestamp("lastSignedIn").defaultNow().notNull(),
 });
 
+// --- TABELA: INGRESSOS (TICKETS) ---
 export const tickets = pgTable("tickets", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   userId: integer("userId")
     .references(() => users.id)
     .notNull(),
   status: ticketStatusEnum("status").default("pending").notNull(),
-  // --- NOVO: Campo para taxa de Cooler ---
   hasCooler: boolean("hasCooler").default(false).notNull(),
-  // --- NOVO: Valor total do ingresso (Ingresso + Cooler opcional) ---
   amount: integer("amount").default(3000).notNull(),
   qrCodeHash: varchar("qrCodeHash", { length: 255 }),
   qrImagePath: text("qrImagePath"),
@@ -64,6 +67,7 @@ export const tickets = pgTable("tickets", {
     .$onUpdate(() => new Date()),
 });
 
+// --- TABELA: PAGAMENTOS ---
 export const payments = pgTable("payments", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   ticketId: integer("ticketId")
@@ -78,6 +82,7 @@ export const payments = pgTable("payments", {
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
+// --- TABELA: LOGS DE ENTRADA (CHECK-IN) ---
 export const checkinLogs = pgTable("checkin_logs", {
   id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
   ticketId: integer("ticketId")
@@ -88,4 +93,17 @@ export const checkinLogs = pgTable("checkin_logs", {
   deviceInfo: text("deviceInfo"),
   result: text("result"),
   notes: text("notes"),
+});
+
+// --- TABELA: CONFIGURAÇÕES DO EVENTO (CMS) ---
+export const eventSettings = pgTable("event_settings", {
+  // Padronizado com generatedAlwaysAsIdentity para evitar erros de push
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  eventName: text("event_name").notNull().default("Furduncinho 047"),
+  eventDate: text("event_date").notNull(), // Formato ISO para o Countdown
+  location: text("location").notNull().default("Local do Evento"),
+  priceNormal: integer("price_normal").notNull().default(3000),
+  priceCooler: integer("price_cooler").notNull().default(7000),
+  serviceFee: integer("service_fee").notNull().default(500),
+  allowCooler: boolean("allow_cooler").notNull().default(true),
 });

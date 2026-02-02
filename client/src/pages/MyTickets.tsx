@@ -40,14 +40,13 @@ export default function MyTickets() {
       toast.success("QR Code salvo!");
     } catch (error) {
       window.open(url, "_blank");
-      toast.info("Imagem aberta. Segure para salvar.");
     }
   };
 
   if (authLoading || ticketsLoading)
     return (
       <div className="min-h-screen bg-black flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
+        <Loader2 className="animate-spin h-12 w-12 text-purple-500" />
       </div>
     );
 
@@ -65,8 +64,7 @@ export default function MyTickets() {
               size="sm"
               className="text-gray-400 hover:text-white"
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Voltar
+              <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
             </Button>
           </Link>
           <div className="flex items-center gap-3">
@@ -85,10 +83,7 @@ export default function MyTickets() {
           {tickets && tickets.length > 0 ? (
             <div className="grid gap-6">
               {tickets.map(ticket => {
-                // CORREÇÃO: Acessando o status de dentro do objeto payment
                 const paymentStatus = ticket.payment?.status;
-                const rejectionReason = ticket.payment?.rejectionReason;
-
                 const isUnderReview =
                   ticket.status === "pending" && paymentStatus === "pending";
                 const isRejected = paymentStatus === "rejected";
@@ -138,16 +133,6 @@ export default function MyTickets() {
                               ENVIO
                             </span>
                           )}
-                          {isUsed && (
-                            <span className="px-2 py-0.5 rounded-full bg-gray-500/20 text-gray-400 text-xs font-bold">
-                              UTILIZADO
-                            </span>
-                          )}
-                          {isRejected && (
-                            <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-400 text-xs font-bold">
-                              REJEITADO
-                            </span>
-                          )}
                         </div>
 
                         <h3 className="text-2xl font-bold text-white mb-1">
@@ -157,32 +142,26 @@ export default function MyTickets() {
                           07/02/2026 • Ilha Dourada
                         </p>
 
-                        {/* TAXA DE COOLER */}
                         <div className="mt-2 text-xs font-semibold uppercase tracking-wider">
-                          {ticket.hasCooler ? (
-                            <span className="text-purple-400">
-                              Com taxa de Cooler (R$ 70,00)
-                            </span>
-                          ) : (
-                            <span className="text-gray-500">
-                              Ingresso Individual (R$ 30,00)
-                            </span>
-                          )}
+                          <span
+                            className={
+                              ticket.hasCooler
+                                ? "text-purple-400"
+                                : "text-gray-500"
+                            }
+                          >
+                            {ticket.hasCooler
+                              ? "Com taxa de Cooler"
+                              : "Ingresso Individual"}{" "}
+                            • R${" "}
+                            {(ticket.amount / 100).toFixed(2).replace(".", ",")}
+                          </span>
                         </div>
-
-                        {isRejected && (
-                          <div className="mt-3 p-3 bg-red-900/20 border border-red-500/30 rounded-lg text-red-300 text-sm flex items-start gap-2">
-                            <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
-                            <div>
-                              <strong>Motivo:</strong>{" "}
-                              {rejectionReason || "Comprovante inválido."}
-                            </div>
-                          </div>
-                        )}
                       </div>
 
+                      {/* AREA DO QR CODE DE ENTRADA (MANTIDA) */}
                       <div className="flex flex-col gap-3 w-full md:w-auto min-w-[200px] items-center">
-                        {isPaid && ticket.qrImagePath && (
+                        {isPaid && ticket.qrImagePath ? (
                           <div className="flex flex-col gap-3 w-full">
                             <div
                               className="bg-white p-3 rounded-xl mx-auto shadow-lg cursor-zoom-in hover:scale-105 transition-transform group relative"
@@ -192,18 +171,21 @@ export default function MyTickets() {
                             >
                               <img
                                 src={ticket.qrImagePath}
-                                alt="QR Code"
+                                alt="QR Code Entrada"
                                 className="h-32 w-32 object-contain"
                               />
                               <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl">
                                 <Maximize2 className="text-black drop-shadow-md h-8 w-8" />
                               </div>
                             </div>
-                            <div className="grid grid-cols-2 gap-2 w-full">
+                            <div className="text-center">
+                              <p className="text-[10px] text-gray-500 font-bold uppercase mb-1">
+                                Código: {ticket.ticketCode}
+                              </p>
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="border-white/20 text-gray-300 h-9 text-xs"
+                                className="w-full border-white/20 text-gray-300 h-9 text-xs"
                                 onClick={() =>
                                   handleDownloadImage(
                                     ticket.qrImagePath!,
@@ -211,35 +193,26 @@ export default function MyTickets() {
                                   )
                                 }
                               >
-                                <Download className="h-3 w-3 mr-1" /> Salvar
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="border-white/20 text-gray-300 h-9 text-xs"
-                                onClick={() =>
-                                  setZoomedImage(ticket.qrImagePath!)
-                                }
-                              >
-                                <Maximize2 className="h-3 w-3 mr-1" /> Ampliar
+                                <Download className="h-3 w-3 mr-1" /> Salvar QR
+                                Code
                               </Button>
                             </div>
                           </div>
-                        )}
-
-                        {ticket.status === "pending" && (
-                          <Link href={`/enviar-comprovante/${ticket.id}`}>
-                            <Button
-                              className={`w-full text-white shadow-lg transition-all ${isUnderReview ? "bg-blue-600 hover:bg-blue-500" : "bg-yellow-600 hover:bg-yellow-500"}`}
-                            >
-                              <UploadCloud className="mr-2 h-4 w-4" />{" "}
-                              {isRejected
-                                ? "Reenviar"
-                                : isUnderReview
-                                  ? "Reenviar (Correção)"
-                                  : "Enviar Comprovante"}
-                            </Button>
-                          </Link>
+                        ) : (
+                          ticket.status === "pending" && (
+                            <Link href={`/enviar-comprovante/${ticket.id}`}>
+                              <Button
+                                className={`w-full text-white shadow-lg transition-all ${isUnderReview ? "bg-blue-600 hover:bg-blue-500" : "bg-yellow-600 hover:bg-yellow-500"}`}
+                              >
+                                <UploadCloud className="mr-2 h-4 w-4" />
+                                {isRejected
+                                  ? "Reenviar"
+                                  : isUnderReview
+                                    ? "Reenviar (Correção)"
+                                    : "Enviar Comprovante"}
+                              </Button>
+                            </Link>
+                          )
                         )}
                       </div>
                     </div>
@@ -253,7 +226,6 @@ export default function MyTickets() {
               <h3 className="text-xl font-bold text-white mb-2">
                 Você não tem ingressos
               </h3>
-              <p className="text-gray-400 mb-6">Garanta sua presença agora.</p>
               <Link href="/comprar">
                 <Button className="bg-purple-600">Comprar Agora</Button>
               </Link>
@@ -262,11 +234,14 @@ export default function MyTickets() {
         </div>
       </div>
 
+      {/* Modal de Zoom do QR Code de Entrada */}
       <Dialog open={!!zoomedImage} onOpenChange={() => setZoomedImage(null)}>
         <DialogContent className="bg-white p-6 max-w-sm rounded-3xl border-0 shadow-2xl flex flex-col items-center outline-none">
           <div className="mb-4 text-center">
-            <h3 className="text-black font-bold text-xl">Seu Ingresso</h3>
-            <p className="text-gray-500 text-sm">Apresente na entrada</p>
+            <h3 className="text-black font-bold text-xl">Acesso Confirmado</h3>
+            <p className="text-gray-500 text-sm">
+              Apresente este QR Code na portaria
+            </p>
           </div>
           {zoomedImage && (
             <img

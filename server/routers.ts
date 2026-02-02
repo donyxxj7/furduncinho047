@@ -1,12 +1,17 @@
-// server/routers.ts
+// server/routers.ts - VERSÃO FINAL BLINDADA COM SOMA ACUMULATIVA
 import { COOKIE_NAME, ONE_YEAR_MS } from "../shared/const.js";
 import { getSessionCookieOptions } from "./_core/cookies.js";
 import { systemRouter } from "./_core/systemRouter.js";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc.js";
 import { z } from "zod";
 import * as db from "./db.js";
-// CORREÇÃO: Importando as tabelas diretamente do schema para o delete funcionar
-import { users, tickets, payments, checkinLogs } from "../src/db/schema.js";
+import {
+  users,
+  tickets,
+  payments,
+  checkinLogs,
+  eventSettings,
+} from "../src/db/schema.js";
 import { eq, not } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
@@ -60,7 +65,12 @@ export const appRouter = router({
           });
         const passwordHash = await bcrypt.hash(input.password, 10);
         const dbInstance = await db.getDb();
-        if (!dbInstance) throw new Error("DB offline");
+        if (!dbInstance)
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "DB offline",
+          });
+
         const newUserResult = await dbInstance
           .insert(users)
           .values({
@@ -71,12 +81,14 @@ export const appRouter = router({
             openid: `temp_${Date.now()}`,
           })
           .returning({ id: users.id });
+
         const newUserId = newUserResult[0]?.id;
         const fakeOpenId = `local_user_${newUserId}`;
         await dbInstance
           .update(users)
           .set({ openid: fakeOpenId })
           .where(eq(users.id, newUserId));
+
         const sessionToken = await sdk.signSession({
           openId: fakeOpenId,
           appId: "furduncinho",
@@ -125,12 +137,34 @@ export const appRouter = router({
     create: protectedProcedure
       .input(z.object({ hasCooler: z.boolean() }))
       .mutation(async ({ ctx, input }) => {
-        const amount = input.hasCooler ? 7000 : 3000;
+        const dbInstance = await db.getDb();
+        if (!dbInstance)
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "DB offline",
+          });
+
+        const settings = await dbInstance.select().from(eventSettings).limit(1);
+        const config = settings[0];
+
+        // 1. Definição dinâmica de preços baseada no Admin (Neon)
+        const basePrice = config?.priceNormal ?? 3000;
+        const serviceFee = config?.serviceFee ?? 0;
+        const coolerPrice = config?.priceCooler ?? 4000;
+
+        // 2. Lógica de Soma Acumulativa: Ingresso + Taxa (se houver)
+        let finalAmount = basePrice + serviceFee;
+
+        // 3. Adiciona o Cooler apenas se selecionado e permitido
+        if (input.hasCooler && (config?.allowCooler ?? true)) {
+          finalAmount += coolerPrice;
+        }
+
         const result = await db.createTicket({
           userId: ctx.user.id,
           status: "pending",
-          hasCooler: input.hasCooler,
-          amount,
+          hasCooler: input.hasCooler && (config?.allowCooler ?? true),
+          amount: finalAmount, // Salva o valor total somado
         });
         return { success: true, ticketId: result?.[0]?.insertedId };
       }),
@@ -184,6 +218,7 @@ export const appRouter = router({
         }
         return { success: true };
       }),
+
     listPending: adminProcedure.query(async () => {
       const pms = await db.getPendingPayments();
       return await Promise.all(
@@ -194,6 +229,7 @@ export const appRouter = router({
         })
       );
     }),
+
     approve: adminProcedure
       .input(z.object({ paymentId: z.number() }))
       .mutation(async ({ ctx, input }) => {
@@ -220,13 +256,17 @@ export const appRouter = router({
         });
         return { success: true };
       }),
+
     reject: adminProcedure
       .input(z.object({ paymentId: z.number(), reason: z.string().optional() }))
       .mutation(async ({ input }) => {
-        const all = await db.getPendingPayments();
-        const payment = all.find(p => p.id === input.paymentId);
-        if (!payment) throw new TRPCError({ code: "NOT_FOUND" });
-        await db.updatePayment(payment.id, {
+        const dbInstance = await db.getDb();
+        if (!dbInstance)
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "DB offline",
+          });
+        await db.updatePayment(input.paymentId, {
           status: "rejected",
           rejectionReason: input.reason,
         });
@@ -277,13 +317,75 @@ export const appRouter = router({
           code: "INTERNAL_SERVER_ERROR",
           message: "DB offline",
         });
-      // Ordem correta de limpeza: Logs -> Pagamentos -> Ingressos -> Usuários comuns
-      await dbInstance.delete(checkinLogs);
-      await dbInstance.delete(payments);
-      await dbInstance.delete(tickets);
+
+      // O segredo está no 'sql.raw' para forçar o reinício do ID
+      const { sql } = await import("drizzle-orm");
+
+      // Apaga os dados e reseta o contador de ID de todas as tabelas
+      await dbInstance.execute(
+        sql`TRUNCATE TABLE checkin_logs, payments, tickets RESTART IDENTITY CASCADE`
+      );
+
+      // Apaga os usuários (exceto admins) - aqui o ID do usuário também pode ser resetado se desejar
       await dbInstance.delete(users).where(not(eq(users.role, "admin")));
+
       return { success: true };
     }),
+  }),
+
+  settings: router({
+    get: publicProcedure.query(async () => {
+      const defaultSettings = {
+        eventName: "Furduncinho 047",
+        eventDate: new Date().toISOString(),
+        location: "Local",
+        priceNormal: 3000,
+        priceCooler: 4000,
+        serviceFee: 0,
+        allowCooler: true,
+      };
+
+      try {
+        const dbInstance = await db.getDb();
+        if (!dbInstance) return defaultSettings;
+        const res = await dbInstance.select().from(eventSettings).limit(1);
+        return res[0] || defaultSettings;
+      } catch (error) {
+        console.error("Erro ao buscar configurações:", error);
+        return defaultSettings;
+      }
+    }),
+    update: adminProcedure
+      .input(
+        z.object({
+          eventName: z.string(),
+          eventDate: z.string(),
+          location: z.string(),
+          priceNormal: z.number(),
+          priceCooler: z.number(),
+          serviceFee: z.number(),
+          allowCooler: z.boolean(),
+        })
+      )
+      .mutation(async ({ input }) => {
+        const dbInstance = await db.getDb();
+        if (!dbInstance)
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "DB offline",
+          });
+
+        const existing = await dbInstance.select().from(eventSettings).limit(1);
+        if (existing.length > 0) {
+          await dbInstance
+            .update(eventSettings)
+            .set(input)
+            .where(eq(eventSettings.id, existing[0].id));
+        } else {
+          await dbInstance.insert(eventSettings).values(input);
+        }
+        return { success: true };
+      }),
   }),
 });
 
