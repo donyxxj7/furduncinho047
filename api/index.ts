@@ -2,9 +2,10 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { appRouter } from "../server/routers";
+import { appRouter } from "../server/routers.ts";
 // Verifique se a pasta se chama _core ou __core (com um ou dois underlines)
-import { createContext } from "../server/_core/context";
+import { createContext } from "../server/_core/context.ts";
+process.env.NODE_ENV = "production";
 
 const app = express();
 
