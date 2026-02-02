@@ -5,8 +5,9 @@ import { systemRouter } from "./_core/systemRouter.js";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc.js";
 import { z } from "zod";
 import * as db from "./db.js";
-import { users, tickets } from "../src/db/schema.js";
-import { eq } from "drizzle-orm";
+// CORREÇÃO: Importando as tabelas diretamente do schema para o delete funcionar
+import { users, tickets, payments, checkinLogs } from "../src/db/schema.js";
+import { eq, not } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
 import QRCode from "qrcode";
@@ -57,11 +58,9 @@ export const appRouter = router({
             code: "BAD_REQUEST",
             message: "Email em uso.",
           });
-
         const passwordHash = await bcrypt.hash(input.password, 10);
         const dbInstance = await db.getDb();
         if (!dbInstance) throw new Error("DB offline");
-
         const newUserResult = await dbInstance
           .insert(users)
           .values({
@@ -72,27 +71,23 @@ export const appRouter = router({
             openid: `temp_${Date.now()}`,
           })
           .returning({ id: users.id });
-
         const newUserId = newUserResult[0]?.id;
         const fakeOpenId = `local_user_${newUserId}`;
         await dbInstance
           .update(users)
           .set({ openid: fakeOpenId })
           .where(eq(users.id, newUserId));
-
         const sessionToken = await sdk.signSession({
           openId: fakeOpenId,
           appId: "furduncinho",
           name: input.name,
         });
-
         ctx.res.cookie(COOKIE_NAME, sessionToken, {
           ...getSessionCookieOptions(ctx.req),
           maxAge: ONE_YEAR_MS,
         });
         return { success: true };
       }),
-
     login: publicProcedure
       .input(z.object({ email: z.string().email(), password: z.string() }))
       .mutation(async ({ input, ctx }) => {
@@ -118,9 +113,7 @@ export const appRouter = router({
         });
         return { success: true, user };
       }),
-
     me: publicProcedure.query(opts => opts.ctx.user),
-
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions });
@@ -141,7 +134,6 @@ export const appRouter = router({
         });
         return { success: true, ticketId: result?.[0]?.insertedId };
       }),
-
     getById: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input }) => {
@@ -149,7 +141,6 @@ export const appRouter = router({
         if (!ticket) throw new TRPCError({ code: "NOT_FOUND" });
         return ticket;
       }),
-
     myTickets: protectedProcedure.query(async ({ ctx }) => {
       const tks = await db.getTicketsByUserId(ctx.user.id);
       return Promise.all(
@@ -173,12 +164,10 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const ticket = await db.getTicketById(input.ticketId);
         if (!ticket) throw new TRPCError({ code: "BAD_REQUEST" });
-
         const upload = await cloudinary.uploader.upload(
           `data:${input.proofMimeType};base64,${input.proofData}`,
           { folder: "furduncinho/comprovantes" }
         );
-
         const existing = await db.getPaymentByTicketId(input.ticketId);
         if (existing) {
           await db.updatePayment(existing.id, {
@@ -195,18 +184,16 @@ export const appRouter = router({
         }
         return { success: true };
       }),
-
     listPending: adminProcedure.query(async () => {
-      const payments = await db.getPendingPayments();
+      const pms = await db.getPendingPayments();
       return await Promise.all(
-        payments.map(async p => {
+        pms.map(async p => {
           const ticket = await db.getTicketById(p.ticketId);
           const user = ticket ? await db.getUserById(ticket.userId) : null;
           return { ...p, ticket, user };
         })
       );
     }),
-
     approve: adminProcedure
       .input(z.object({ paymentId: z.number() }))
       .mutation(async ({ ctx, input }) => {
@@ -215,13 +202,11 @@ export const appRouter = router({
         if (!payment) throw new TRPCError({ code: "NOT_FOUND" });
         const ticket = await db.getTicketById(payment.ticketId);
         if (!ticket) throw new TRPCError({ code: "NOT_FOUND" });
-
         const qrHash = generateQrHash(ticket.id, ticket.userId);
         const qrDataUrl = await QRCode.toDataURL(qrHash);
         const upload = await cloudinary.uploader.upload(qrDataUrl, {
           folder: "furduncinho/qrcodes",
         });
-
         await db.updateTicket(ticket.id, {
           status: "paid",
           qrCodeHash: qrHash,
@@ -235,7 +220,6 @@ export const appRouter = router({
         });
         return { success: true };
       }),
-
     reject: adminProcedure
       .input(z.object({ paymentId: z.number(), reason: z.string().optional() }))
       .mutation(async ({ input }) => {
@@ -257,7 +241,6 @@ export const appRouter = router({
         const ticket = await db.getTicketByQrHash(input.qrHash);
         if (!ticket || ticket.status !== "paid")
           return { valid: false, message: "Inválido ou já utilizado" };
-
         await db.updateTicket(ticket.id, {
           status: "used",
           validatedAt: new Date(),
@@ -268,29 +251,38 @@ export const appRouter = router({
           result: "valid",
           notes: ticket.hasCooler ? "COM COOLER" : "OK",
         });
-
         return { valid: true, hasCooler: ticket.hasCooler, ticket };
       }),
-    logs: adminProcedure.query(async () => await db.getCheckinLogs()),
   }),
 
   admin: router({
     dashboard: adminProcedure.query(async () => {
-      const ticketsList = await db.getAllTickets();
-      const paymentsList = await db.getPendingPayments();
+      const tks = await db.getAllTickets();
+      const pms = await db.getPendingPayments();
       const logs = await db.getCheckinLogs();
-
-      // --- AQUI ESTÁ A DECLARAÇÃO QUE FALTAVA ---
-      const paidTickets = ticketsList.filter(
+      const paidTickets = tks.filter(
         t => t.status === "paid" || t.status === "used"
       ).length;
-
       return {
-        totalTickets: ticketsList.length,
-        pendingPayments: paymentsList.length,
+        totalTickets: tks.length,
+        pendingPayments: pms.length,
         totalCheckins: logs.filter(l => l.result === "valid").length,
-        paidTickets, // Agora o valor existe no escopo!
+        paidTickets,
       };
+    }),
+    resetData: adminProcedure.mutation(async () => {
+      const dbInstance = await db.getDb();
+      if (!dbInstance)
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "DB offline",
+        });
+      // Ordem correta de limpeza: Logs -> Pagamentos -> Ingressos -> Usuários comuns
+      await dbInstance.delete(checkinLogs);
+      await dbInstance.delete(payments);
+      await dbInstance.delete(tickets);
+      await dbInstance.delete(users).where(not(eq(users.role, "admin")));
+      return { success: true };
     }),
   }),
 });
