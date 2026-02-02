@@ -1,17 +1,17 @@
 // server/routers.ts
-import { COOKIE_NAME, ONE_YEAR_MS } from "../shared/const.js";
-import { getSessionCookieOptions } from "./_core/cookies.js";
-import { systemRouter } from "./_core/systemRouter.js";
-import { publicProcedure, protectedProcedure, router } from "./_core/trpc.js";
+import { COOKIE_NAME, ONE_YEAR_MS } from "../shared/const.js"; // Adicione .js
+import { getSessionCookieOptions } from "./_core/cookies.js"; // Adicione .js
+import { systemRouter } from "./_core/systemRouter.js"; // Adicione .js
+import { publicProcedure, protectedProcedure, router } from "./_core/trpc.js"; // Adicione .js
 import { z } from "zod";
-import * as db from "./db.js";
-import { users, tickets } from "../src/db/schema.js";
+import * as db from "./db.js"; // Adicione .js
+import { users, tickets } from "../src/db/schema.js"; // Adicione .js
 import { eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
 import QRCode from "qrcode";
 import bcrypt from "bcrypt";
-import { sdk } from "./_core/sdk.js";
+import { sdk } from "./_core/sdk.js"; // Adicione .js
 import { v2 as cloudinary } from "cloudinary";
 
 cloudinary.config({

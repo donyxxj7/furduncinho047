@@ -1,10 +1,9 @@
 import { eq, and, desc } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import * as schema from "../src/db/schema";
-import { ENV } from "./_core/env";
+import * as schema from "../src/db/schema.js"; // ADICIONADO .js
+import { ENV } from "./_core/env.js"; // ADICIONADO .js
 
-// Extraímos as tabelas do schema para uso nas queries
 const { users, tickets, payments, checkinLogs } = schema;
 
 // Tipos inferidos para inserção
