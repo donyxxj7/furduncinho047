@@ -1,5 +1,8 @@
 {
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/index.html" }
+  "version": 2,
+  "rewrites": [{ "source": "/api/trpc/:path*", "destination": "/api/trpc" }],
+  "routes": [
+    { "src": "/api/trpc/(.*)", "dest": "/api/trpc.ts" },
+    { "src": "/(.*)", "dest": "/index.html" }
   ]
 }
