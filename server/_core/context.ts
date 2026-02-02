@@ -1,8 +1,8 @@
 import { type CreateExpressContextOptions } from "@trpc/server/adapters/express";
-import { getDb } from "../db";
+import { getDb } from "../db.js";
 import { users } from "../../src/db/schema";
 import { eq } from "drizzle-orm";
-import { sdk } from "./sdk"; // Importamos o seu SDK que já lida com o JWT
+import { sdk } from "./sdk.js"; // Importamos o seu SDK que já lida com o JWT
 import { COOKIE_NAME } from "@shared/const";
 
 async function getUserFromCookie(req: CreateExpressContextOptions["req"]) {
