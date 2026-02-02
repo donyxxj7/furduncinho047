@@ -142,6 +142,8 @@ export const appRouter = router({
       );
     }),
   }),
+  // server/routers.ts
+
   payments: router({
     submitProof: protectedProcedure
       .input(
@@ -174,6 +176,54 @@ export const appRouter = router({
         }
         return { success: true };
       }),
+
+    // --- ADICIONE ESTAS TRÊS ROTAS ABAIXO PARA LIMPAR O ERRO 404 ---
+    listPending: adminProcedure.query(async () => {
+      const payments = await db.getPendingPayments();
+      return await Promise.all(
+        payments.map(async p => {
+          const ticket = await db.getTicketById(p.ticketId);
+          const user = ticket ? await db.getUserById(ticket.userId) : null;
+          return { ...p, ticket, user };
+        })
+      );
+    }),
+
+    approve: adminProcedure
+      .input(z.object({ paymentId: z.number() }))
+      .mutation(async ({ ctx, input }) => {
+        const all = await db.getPendingPayments();
+        const payment = all.find(p => p.id === input.paymentId);
+        if (!payment) throw new TRPCError({ code: "NOT_FOUND" });
+        const ticket = await db.getTicketById(payment.ticketId);
+        if (!ticket) throw new TRPCError({ code: "NOT_FOUND" });
+
+        const qrHash = generateQrHash(ticket.id, ticket.userId);
+        await db.updateTicket(ticket.id, {
+          status: "paid",
+          qrCodeHash: qrHash,
+          ticketCode: generateTicketCode(),
+          generatedAt: new Date(),
+        });
+        await db.updatePayment(payment.id, {
+          status: "approved",
+          approvedBy: ctx.user.id,
+        });
+        return { success: true };
+      }),
+
+    reject: adminProcedure
+      .input(z.object({ paymentId: z.number(), reason: z.string().optional() }))
+      .mutation(async ({ input }) => {
+        const all = await db.getPendingPayments();
+        const payment = all.find(p => p.id === input.paymentId);
+        if (!payment) throw new TRPCError({ code: "NOT_FOUND" });
+        await db.updatePayment(payment.id, {
+          status: "rejected",
+          rejectionReason: input.reason,
+        });
+        return { success: true };
+      }),
   }),
 
   // --- ADICIONE ESTES BLOCOS AQUI EMBAIXO ---
@@ -182,16 +232,20 @@ export const appRouter = router({
       .input(z.object({ qrHash: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const ticket = await db.getTicketByQrHash(input.qrHash);
-        if (!ticket || ticket.status !== "paid") return { valid: false, message: "Inválido" };
-        
-        await db.updateTicket(ticket.id, { status: "used", validatedAt: new Date() });
-        await db.createCheckinLog({ 
-          ticketId: ticket.id, 
-          adminId: ctx.user.id, 
-          result: "valid", 
-          notes: ticket.hasCooler ? "COM COOLER" : "OK" 
+        if (!ticket || ticket.status !== "paid")
+          return { valid: false, message: "Inválido" };
+
+        await db.updateTicket(ticket.id, {
+          status: "used",
+          validatedAt: new Date(),
         });
-        
+        await db.createCheckinLog({
+          ticketId: ticket.id,
+          adminId: ctx.user.id,
+          result: "valid",
+          notes: ticket.hasCooler ? "COM COOLER" : "OK",
+        });
+
         return { valid: true, hasCooler: ticket.hasCooler, ticket };
       }),
     logs: adminProcedure.query(async () => await db.getCheckinLogs()),
