@@ -2,8 +2,8 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { appRouter } from "../server/routers"; // SEM .ts
-import { createContext } from "../server/_core/context"; // SEM .ts
+import { appRouter } from "../server/routers.js"; // SEM .ts
+import { createContext } from "../server/_core/context.js"; // SEM .ts
 
 process.env.NODE_ENV = "production";
 
