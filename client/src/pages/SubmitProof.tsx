@@ -1,12 +1,11 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { APP_LOGO } from "@/const";
 import { trpc } from "@/lib/trpc";
 import {
   ArrowLeft,
   UploadCloud,
-  FileImage,
   X,
   CheckCircle2,
   Loader2,
@@ -17,7 +16,7 @@ import { Link, useLocation, useRoute } from "wouter";
 import { toast } from "sonner";
 
 export default function SubmitProof() {
-  const { user, isAuthenticated } = useAuth({
+  const { isAuthenticated } = useAuth({
     redirectOnUnauthenticated: true,
   });
   const [, params] = useRoute("/enviar-comprovante/:ticketId");
@@ -28,7 +27,7 @@ export default function SubmitProof() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Busca dados do ingresso para mostrar no topo
+  // Busca dados do ingresso para mostrar o valor real do banco
   const { data: ticket, isLoading } = trpc.tickets.getById.useQuery(
     { id: ticketId },
     {
@@ -49,7 +48,6 @@ export default function SubmitProof() {
     const file = event.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        // 5MB limit
         toast.error("O arquivo deve ter no máximo 5MB");
         return;
       }
@@ -65,7 +63,6 @@ export default function SubmitProof() {
     const reader = new FileReader();
     reader.onloadend = () => {
       const base64String = reader.result as string;
-      // Remove o prefixo "data:image/xyz;base64," para enviar só os dados
       const base64Data = base64String.split(",")[1];
 
       submitProofMutation.mutate({
@@ -99,7 +96,6 @@ export default function SubmitProof() {
 
   return (
     <div className="min-h-screen bg-black text-white relative overflow-hidden">
-      {/* Luzes de Fundo */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <div className="absolute top-[-10%] left-[50%] -translate-x-1/2 w-[600px] h-[600px] bg-purple-900/10 blur-[120px] rounded-full"></div>
       </div>
@@ -128,7 +124,6 @@ export default function SubmitProof() {
 
       <div className="container mx-auto px-4 py-8 relative z-10 flex flex-col items-center">
         <div className="w-full max-w-md space-y-6">
-          {/* Card de Informação do Pedido */}
           <Card className="bg-white/5 border-white/10 backdrop-blur-md">
             <CardContent className="p-4 flex items-center justify-between">
               <div>
@@ -143,12 +138,17 @@ export default function SubmitProof() {
                 <p className="text-xs text-gray-400 uppercase tracking-wider">
                   Valor
                 </p>
-                <p className="text-xl font-bold text-white">R$ 30,00</p>
+                {/* VALOR DINÂMICO AQUI */}
+                <p className="text-xl font-bold text-white">
+                  {(ticket.amount / 100).toLocaleString("pt-BR", {
+                    style: "currency",
+                    currency: "BRL",
+                  })}
+                </p>
               </div>
             </CardContent>
           </Card>
 
-          {/* Área Principal de Upload */}
           <div className="bg-black/40 border border-dashed border-purple-500/30 rounded-2xl p-8 text-center hover:border-purple-500/60 transition-colors relative group">
             <input
               type="file"
@@ -161,7 +161,7 @@ export default function SubmitProof() {
 
             {!selectedFile ? (
               <div className="flex flex-col items-center gap-4 py-8">
-                <div className="h-20 w-20 bg-purple-500/10 rounded-full flex items-center justify-center group-hover:bg-purple-500/20 transition-all border border-purple-500/20 group-hover:scale-110 duration-300">
+                <div className="h-20 w-20 bg-purple-500/10 rounded-full flex items-center justify-center border border-purple-500/20 group-hover:scale-110 duration-300">
                   <UploadCloud className="h-10 w-10 text-purple-400" />
                 </div>
                 <div className="space-y-1">
@@ -203,7 +203,6 @@ export default function SubmitProof() {
             )}
           </div>
 
-          {/* Instruções */}
           {!selectedFile && (
             <div className="flex gap-3 bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl items-start">
               <AlertCircle className="h-5 w-5 text-blue-400 shrink-0 mt-0.5" />
@@ -216,7 +215,6 @@ export default function SubmitProof() {
             </div>
           )}
 
-          {/* Botão de Envio */}
           <Button
             className={`w-full h-14 text-lg font-bold rounded-xl transition-all ${
               selectedFile

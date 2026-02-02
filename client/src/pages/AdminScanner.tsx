@@ -16,6 +16,7 @@ import {
   XCircle,
   AlertCircle,
   Snowflake,
+  Loader2,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
@@ -32,9 +33,8 @@ export default function AdminScanner() {
     onSuccess: data => {
       setLastResult(data);
       if (data.valid) {
-        // Alerta sonoro ou vibração no celular para agilizar a portaria
         if (navigator.vibrate) navigator.vibrate(200);
-        toast.success("Ingresso válido!");
+        toast.success(data.hasCooler ? "VÁLIDO + COOLER!" : "Ingresso válido!");
       } else {
         toast.error(data.message);
       }
@@ -56,38 +56,30 @@ export default function AdminScanner() {
     try {
       const scanner = new Html5Qrcode("qr-reader");
       scannerRef.current = scanner;
-
       const cameras = await Html5Qrcode.getCameras();
-      if (cameras && cameras.length > 0) {
-        // Seleciona a última câmera (geralmente a traseira do celular)
-        const selectedCamera = cameras[cameras.length - 1];
 
+      if (cameras && cameras.length > 0) {
+        const selectedCamera = cameras[cameras.length - 1]; // Câmera traseira
         await scanner.start(
           selectedCamera.id,
-          {
-            fps: 10,
-            qrbox: { width: 250, height: 250 },
-          },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
           decodedText => {
             validateMutation.mutate({ qrHash: decodedText });
             scanner.pause(true);
-            // Pausa de 3 segundos para o segurança ver o resultado na tela
             setTimeout(() => {
               if (scanner.isScanning) {
                 scanner.resume();
                 setLastResult(null);
               }
-            }, 3000);
+            }, 3000); // Pausa para leitura visual do resultado
           },
           () => {}
         );
-
         setScanning(true);
       } else {
         toast.error("Nenhuma câmera encontrada");
       }
     } catch (error) {
-      console.error("Error starting scanner:", error);
       toast.error("Erro ao iniciar scanner");
     }
   };
@@ -99,11 +91,16 @@ export default function AdminScanner() {
         setScanning(false);
       }
     } catch (error) {
-      console.error("Error stopping scanner:", error);
+      console.error(error);
     }
   };
 
-  if (authLoading) return null;
+  if (authLoading)
+    return (
+      <div className="min-h-screen bg-black flex items-center justify-center">
+        <Loader2 className="animate-spin text-purple-500" />
+      </div>
+    );
 
   if (!isAuthenticated || user?.role !== "admin") {
     return (
@@ -137,7 +134,6 @@ export default function AdminScanner() {
           <div className="flex items-center gap-3">
             <img
               src={APP_LOGO}
-              alt="Logo"
               className="h-10 w-10 rounded-full border border-white/10"
             />
             <h1 className="text-xl font-bold">Portaria 047</h1>
@@ -148,8 +144,7 @@ export default function AdminScanner() {
 
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-md mx-auto space-y-6">
-          {/* ÁREA DA CÂMERA */}
-          <div className="relative aspect-square overflow-hidden rounded-3xl border-2 border-purple-500/30 bg-white/5 shadow-[0_0_50px_rgba(168,85,247,0.1)]">
+          <div className="relative aspect-square overflow-hidden rounded-3xl border-2 border-purple-500/30 bg-white/5">
             <div id="qr-reader" className="w-full h-full"></div>
             {!scanning && (
               <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 gap-4">
@@ -162,12 +157,8 @@ export default function AdminScanner() {
                 </Button>
               </div>
             )}
-            {scanning && (
-              <div className="absolute inset-0 border-[40px] border-black/40 pointer-events-none"></div>
-            )}
           </div>
 
-          {/* RESULTADO COM ALERTA DE COOLER */}
           {lastResult && (
             <Card
               className={`border-4 animate-in zoom-in duration-300 ${
@@ -190,27 +181,27 @@ export default function AdminScanner() {
                     <XCircle className="h-12 w-12 text-red-500" />
                   )}
                 </div>
-                <CardTitle className="text-3xl font-black text-white">
+                <CardTitle className="text-3xl font-black">
                   {lastResult.valid
                     ? lastResult.hasCooler
                       ? "COM COOLER"
                       : "LIBERADO"
                     : "BLOQUEADO"}
                 </CardTitle>
-                <CardDescription className="text-white font-bold opacity-90">
+                <CardDescription className="text-white font-bold">
                   {lastResult.message}
                 </CardDescription>
               </CardHeader>
               {lastResult.ticket && (
-                <CardContent className="bg-black/40 mx-4 mb-4 rounded-xl p-4 border border-white/10">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-400">ID Pedido:</span>
+                <CardContent className="bg-black/40 mx-4 mb-4 rounded-xl p-4 border border-white/10 text-sm">
+                  <div className="flex justify-between">
+                    <span>ID Pedido:</span>
                     <span className="font-mono font-bold">
                       #{lastResult.ticket.id}
                     </span>
                   </div>
-                  <div className="flex justify-between text-sm mt-1">
-                    <span className="text-gray-400">Valor Pago:</span>
+                  <div className="flex justify-between mt-1">
+                    <span>Valor:</span>
                     <span className="font-bold">
                       R$ {(lastResult.ticket.amount / 100).toFixed(2)}
                     </span>
@@ -224,7 +215,7 @@ export default function AdminScanner() {
             <Button
               onClick={stopScanning}
               variant="ghost"
-              className="w-full text-red-500 hover:text-red-400 hover:bg-red-500/10"
+              className="w-full text-red-500"
             >
               Desativar Câmera
             </Button>

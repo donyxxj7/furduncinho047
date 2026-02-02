@@ -1,6 +1,6 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { APP_LOGO } from "@/const";
 import { trpc } from "@/lib/trpc";
 import {
@@ -13,20 +13,18 @@ import {
   Loader2,
   Download,
   Maximize2,
-  X,
 } from "lucide-react";
 import { Link } from "wouter";
 import { toast } from "sonner";
 import { useState } from "react";
 
 export default function MyTickets() {
-  const { user, loading: authLoading, isAuthenticated } = useAuth();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const { data: tickets, isLoading: ticketsLoading } =
     trpc.tickets.myTickets.useQuery(undefined, {
       enabled: isAuthenticated,
     });
 
-  // Estado para controlar qual QR Code está expandido (Zoom)
   const [zoomedImage, setZoomedImage] = useState<string | null>(null);
 
   const handleDownloadImage = async (url: string, filename: string) => {
@@ -39,11 +37,10 @@ export default function MyTickets() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      toast.success("QR Code salvo na galeria!");
+      toast.success("QR Code salvo!");
     } catch (error) {
-      // Fallback se o navegador bloquear download direto de cross-origin
       window.open(url, "_blank");
-      toast.info("Imagem aberta. Segure nela para salvar.");
+      toast.info("Imagem aberta. Segure para salvar.");
     }
   };
 
@@ -88,22 +85,24 @@ export default function MyTickets() {
           {tickets && tickets.length > 0 ? (
             <div className="grid gap-6">
               {tickets.map(ticket => {
+                // CORREÇÃO: Acessando o status de dentro do objeto payment
+                const paymentStatus = ticket.payment?.status;
+                const rejectionReason = ticket.payment?.rejectionReason;
+
                 const isUnderReview =
-                  ticket.status === "pending" &&
-                  ticket.paymentStatus === "pending";
-                const isRejected = ticket.paymentStatus === "rejected";
+                  ticket.status === "pending" && paymentStatus === "pending";
+                const isRejected = paymentStatus === "rejected";
                 const isPaid = ticket.status === "paid";
                 const isUsed = ticket.status === "used";
-                const isWaiting =
-                  ticket.status === "pending" && !ticket.paymentStatus;
+                const isWaiting = ticket.status === "pending" && !paymentStatus;
 
                 return (
                   <div
                     key={ticket.id}
-                    className="group relative bg-white/5 border border-white/10 rounded-2xl overflow-hidden hover:border-purple-500/50 transition-all hover:bg-white/10"
+                    className="group relative bg-white/5 border border-white/10 rounded-2xl overflow-hidden hover:border-purple-500/50 transition-all"
                   >
                     <div
-                      className={`absolute left-0 top-0 bottom-0 w-2 transition-colors duration-500 ${
+                      className={`absolute left-0 top-0 bottom-0 w-2 ${
                         isPaid
                           ? "bg-green-500 shadow-[0_0_15px_#22c55e]"
                           : isUnderReview
@@ -158,21 +157,26 @@ export default function MyTickets() {
                           07/02/2026 • Ilha Dourada
                         </p>
 
+                        {/* TAXA DE COOLER */}
+                        <div className="mt-2 text-xs font-semibold uppercase tracking-wider">
+                          {ticket.hasCooler ? (
+                            <span className="text-purple-400">
+                              Com taxa de Cooler (R$ 70,00)
+                            </span>
+                          ) : (
+                            <span className="text-gray-500">
+                              Ingresso Individual (R$ 30,00)
+                            </span>
+                          )}
+                        </div>
+
                         {isRejected && (
                           <div className="mt-3 p-3 bg-red-900/20 border border-red-500/30 rounded-lg text-red-300 text-sm flex items-start gap-2">
                             <AlertCircle className="h-4 w-4 mt-0.5 shrink-0" />
                             <div>
-                              <strong>Motivo da recusa:</strong>{" "}
-                              {ticket.rejectionReason ||
-                                "Comprovante inválido."}
+                              <strong>Motivo:</strong>{" "}
+                              {rejectionReason || "Comprovante inválido."}
                             </div>
-                          </div>
-                        )}
-
-                        {isUnderReview && (
-                          <div className="mt-2 text-blue-400/80 text-xs flex items-center gap-1.5">
-                            <Loader2 className="h-3 w-3 animate-spin" />{" "}
-                            Verificando comprovante...
                           </div>
                         )}
                       </div>
@@ -180,9 +184,8 @@ export default function MyTickets() {
                       <div className="flex flex-col gap-3 w-full md:w-auto min-w-[200px] items-center">
                         {isPaid && ticket.qrImagePath && (
                           <div className="flex flex-col gap-3 w-full">
-                            {/* QR CODE CLICÁVEL (ZOOM) */}
                             <div
-                              className="bg-white p-3 rounded-xl mx-auto shadow-[0_0_20px_rgba(34,197,94,0.3)] cursor-zoom-in hover:scale-105 transition-transform group relative"
+                              className="bg-white p-3 rounded-xl mx-auto shadow-lg cursor-zoom-in hover:scale-105 transition-transform group relative"
                               onClick={() =>
                                 setZoomedImage(ticket.qrImagePath!)
                               }
@@ -196,13 +199,11 @@ export default function MyTickets() {
                                 <Maximize2 className="text-black drop-shadow-md h-8 w-8" />
                               </div>
                             </div>
-
-                            {/* BOTÕES DE AÇÃO */}
                             <div className="grid grid-cols-2 gap-2 w-full">
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="border-white/20 text-gray-300 hover:text-white h-9 text-xs flex-1"
+                                className="border-white/20 text-gray-300 h-9 text-xs"
                                 onClick={() =>
                                   handleDownloadImage(
                                     ticket.qrImagePath!,
@@ -215,7 +216,7 @@ export default function MyTickets() {
                               <Button
                                 size="sm"
                                 variant="outline"
-                                className="border-white/20 text-gray-300 hover:text-white h-9 text-xs flex-1"
+                                className="border-white/20 text-gray-300 h-9 text-xs"
                                 onClick={() =>
                                   setZoomedImage(ticket.qrImagePath!)
                                 }
@@ -252,22 +253,17 @@ export default function MyTickets() {
               <h3 className="text-xl font-bold text-white mb-2">
                 Você não tem ingressos
               </h3>
-              <p className="text-gray-400 mb-6">
-                Garanta sua presença no maior evento do ano.
-              </p>
+              <p className="text-gray-400 mb-6">Garanta sua presença agora.</p>
               <Link href="/comprar">
-                <Button className="bg-purple-600 hover:bg-purple-500">
-                  Comprar Agora
-                </Button>
+                <Button className="bg-purple-600">Comprar Agora</Button>
               </Link>
             </div>
           )}
         </div>
       </div>
 
-      {/* MODAL DE ZOOM (FULLSCREEN) */}
       <Dialog open={!!zoomedImage} onOpenChange={() => setZoomedImage(null)}>
-        <DialogContent className="bg-white p-4 max-w-sm rounded-3xl border-0 shadow-2xl flex flex-col items-center justify-center outline-none">
+        <DialogContent className="bg-white p-6 max-w-sm rounded-3xl border-0 shadow-2xl flex flex-col items-center outline-none">
           <div className="mb-4 text-center">
             <h3 className="text-black font-bold text-xl">Seu Ingresso</h3>
             <p className="text-gray-500 text-sm">Apresente na entrada</p>
