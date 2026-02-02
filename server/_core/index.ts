@@ -1,6 +1,7 @@
 import "dotenv/config";
 import express, { type Request, type Response } from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser"; // Adicionado para ler a sessão
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
@@ -37,7 +38,7 @@ async function findAvailablePort(startPort: number = 3000): Promise<number> {
   throw new Error(`No available port found starting from ${startPort}`);
 }
 
-// ---------------- HEALTH ROUTE (CORRIGIDO) -----------------
+// ---------------- HEALTH ROUTE -----------------
 
 function setupHealthRoute(app: express.Express) {
   app.get("/health", (req: Request, res: Response) => {
@@ -54,6 +55,7 @@ function startKeepAlive() {
     try {
       const database = await db.getDb();
       if (database) {
+        // Ping adaptado para Postgres
         await database.execute(sql`SELECT 1`);
       }
     } catch (error) {
@@ -77,14 +79,15 @@ async function startServer() {
   const app = express();
   const server = createServer(app);
 
-  // --------------- CORS CORRIGIDO -------------------
+  // --------------- CORS CONFIG -------------------
 
   app.use(
     cors({
       origin: [
         "http://localhost:5173",
         "http://localhost:3000",
-        "https://app-furduncinho-oficial.vercel.app", // dominio da vercel
+        "https://app-furduncinho-oficial.vercel.app",
+        "https://lailah-unproud-alfonzo.ngrok-free.dev",
       ],
       credentials: true,
       methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
@@ -92,16 +95,17 @@ async function startServer() {
     })
   );
 
-  // Evita erro 405 nas preflight OPTIONS
   app.options("*", cors());
 
-  // -----------------------------------------------------
+  // ---------------- MIDDLEWARES -------------------
+
+  // Essencial para o tRPC ler o cookie 'app_session_id'
+  app.use(cookieParser());
 
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
   setupHealthRoute(app);
-
   registerOAuthRoutes(app);
 
   // --------------- tRPC -------------------------------

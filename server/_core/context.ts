@@ -1,37 +1,38 @@
 import { type CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import { getDb } from "../db";
-import jwt from "jsonwebtoken";
-// --- CORREÇÃO AQUI: Voltamos DUAS pastas (../..) para achar o drizzle na raiz ---
-import { users } from "../../drizzle/schema";
+import { users } from "../../src/db/schema";
 import { eq } from "drizzle-orm";
+import { sdk } from "./sdk"; // Importamos o seu SDK que já lida com o JWT
+import { COOKIE_NAME } from "@shared/const";
 
-async function getUserFromHeader(req: CreateExpressContextOptions["req"]) {
+async function getUserFromCookie(req: CreateExpressContextOptions["req"]) {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader) return null;
-
-    const token = authHeader.split(" ")[1];
+    const token = req.cookies[COOKIE_NAME];
     if (!token) return null;
 
-    if (!process.env.JWT_SECRET) return null;
+    const payload = await sdk.verifySession(token);
 
-    const decoded: any = jwt.verify(token, process.env.JWT_SECRET);
-    if (!decoded || !decoded.userId) return null;
+    // CORREÇÃO 1: Verifica se o payload existe para evitar o erro 'possivelmente null'
+    if (!payload) return null;
+
+    // CORREÇÃO 2: Usa o 'as any' para ler o openid minúsculo sem o TS reclamar
+    // Tentamos ler o minúsculo primeiro, se não existir, pegamos o CamelCase
+    const userOpenId = (payload as any).openid || payload.openId;
+
+    if (!userOpenId) return null;
 
     const db = await getDb();
-
-    // Verificação de segurança
     if (!db) return null;
 
-    // Busca o usuário
     const result = await db
       .select()
       .from(users)
-      .where(eq(users.id, decoded.userId))
+      .where(eq(users.openid, userOpenId))
       .limit(1);
 
     return result[0] || null;
   } catch (err) {
+    console.error("Erro no contexto de auth:", err);
     return null;
   }
 }
@@ -41,7 +42,7 @@ export const createContext = async ({
   res,
 }: CreateExpressContextOptions) => {
   const db = await getDb();
-  const user = await getUserFromHeader(req);
+  const user = await getUserFromCookie(req);
 
   return {
     req,

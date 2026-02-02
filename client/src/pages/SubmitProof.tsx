@@ -143,7 +143,7 @@ export default function SubmitProof() {
                 <p className="text-xs text-gray-400 uppercase tracking-wider">
                   Valor
                 </p>
-                <p className="text-xl font-bold text-white">R$ 25,00</p>
+                <p className="text-xl font-bold text-white">R$ 30,00</p>
               </div>
             </CardContent>
           </Card>

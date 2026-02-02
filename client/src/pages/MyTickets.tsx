@@ -155,7 +155,7 @@ export default function MyTickets() {
                           Ingresso Furduncinho047
                         </h3>
                         <p className="text-gray-400 text-sm">
-                          07/03/2026 • Local a definir
+                          07/02/2026 • Ilha Dourada
                         </p>
 
                         {isRejected && (

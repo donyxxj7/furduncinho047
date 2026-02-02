@@ -47,7 +47,7 @@ Veja o arquivo `GUIA_CONFIGURACAO_MYSQL.md` para instruções detalhadas.
 
 ### Para Usuários:
 - ✅ Cadastro e login
-- ✅ Compra de ingressos (R$ 25,00)
+- ✅ Compra de ingressos (R$ 30,00)
 - ✅ Pagamento via PIX
 - ✅ Upload de comprovante
 - ✅ Visualização de ingresso com QR Code

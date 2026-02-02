@@ -4,7 +4,7 @@ import { systemRouter } from "./_core/systemRouter";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
 import { z } from "zod";
 import * as db from "./db";
-import { users } from "../drizzle/schema";
+import { users, tickets } from "../src/db/schema";
 import { eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
@@ -62,45 +62,40 @@ export const appRouter = router({
         const dbInstance = await db.getDb();
         if (!dbInstance) throw new Error("Database not available");
 
-        // --- CORREÇÃO AQUI ---
-        // Adicionamos um openId temporário para o banco aceitar a criação
-        const newUserResult = await dbInstance.insert(users).values({
-          name: input.name,
-          email: input.email,
-          passwordHash: passwordHash,
-          loginMethod: "local",
-          openId: `temp_${Date.now()}_${Math.random()}`, // Valor provisório
-        });
-        // ---------------------
+        const newUserResult = await dbInstance
+          .insert(users)
+          .values({
+            name: input.name,
+            email: input.email,
+            passwordHash: passwordHash,
+            loginMethod: "local",
+            openid: `temp_${Date.now()}`,
+          })
+          .returning({ id: users.id });
 
-        const newUserId = Number((newUserResult as any)[0].insertId);
+        const newUserId = newUserResult[0]?.id;
 
-        if (isNaN(newUserId) || newUserId === 0) {
+        if (!newUserId) {
           throw new TRPCError({
             code: "INTERNAL_SERVER_ERROR",
-            message: "Falha ao criar usuário, não foi possível obter o ID.",
+            message: "Falha ao criar usuário.",
           });
         }
 
         const fakeOpenId = `local_user_${newUserId}`;
         await dbInstance
           .update(users)
-          .set({ openId: fakeOpenId })
+          .set({ openid: fakeOpenId })
           .where(eq(users.id, newUserId));
 
         const newUser = await db.getUserById(newUserId);
-        if (!newUser) {
-          throw new TRPCError({
-            code: "INTERNAL_SERVER_ERROR",
-            message: "Falha ao buscar usuário recém-criado.",
-          });
-        }
+        if (!newUser) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
 
         const sessionToken = await sdk.signSession({
           openId: fakeOpenId,
           appId: "furduncinho_local_app",
           name: input.name,
-        });
+        } as any);
 
         const cookieOptions = getSessionCookieOptions(ctx.req);
         ctx.res.cookie(COOKIE_NAME, sessionToken, {
@@ -129,10 +124,10 @@ export const appRouter = router({
           });
 
         const sessionToken = await sdk.signSession({
-          openId: user.openId!,
+          openId: user.openid!,
           appId: "furduncinho_local_app",
           name: user.name || "User",
-        });
+        } as any);
 
         const cookieOptions = getSessionCookieOptions(ctx.req);
         ctx.res.cookie(COOKIE_NAME, sessionToken, {
@@ -152,27 +147,41 @@ export const appRouter = router({
   }),
 
   tickets: router({
-    create: protectedProcedure.mutation(async ({ ctx }) => {
-      // VERSÃO SIMPLIFICADA (SEM LOTES)
-      const existingTickets = await db.getTicketsByUserId(ctx.user.id);
-      const hasPendingOrPaid = existingTickets.some(
-        t => t.status === "pending" || t.status === "paid"
-      );
+    create: protectedProcedure
+      .input(z.object({ hasCooler: z.boolean() }))
+      .mutation(async ({ ctx, input }) => {
+        const existingTickets = await db.getTicketsByUserId(ctx.user.id);
+        const hasActive = existingTickets.some(
+          t => t.status === "pending" || t.status === "paid"
+        );
 
-      if (hasPendingOrPaid) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Você já possui um ingresso.",
+        if (hasActive) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Você já possui um ingresso.",
+          });
+        }
+
+        const finalAmount = input.hasCooler ? 7000 : 3000;
+
+        const result = await db.createTicket({
+          userId: ctx.user.id,
+          status: "pending",
+          hasCooler: input.hasCooler,
+          amount: finalAmount,
         });
-      }
 
-      const result = await db.createTicket({
-        userId: ctx.user.id,
-        status: "pending",
-      });
-      const insertId = (result as any)[0].insertId || 0;
-      return { success: true, ticketId: Number(insertId) };
-    }),
+        const ticketId = result?.[0]?.insertedId;
+
+        if (!ticketId) {
+          throw new TRPCError({
+            code: "INTERNAL_SERVER_ERROR",
+            message: "Falha ao gerar o pedido no banco de dados.",
+          });
+        }
+
+        return { success: true, ticketId };
+      }),
 
     myTickets: protectedProcedure.query(async ({ ctx }) => {
       const tickets = await db.getTicketsByUserId(ctx.user.id);
@@ -190,16 +199,13 @@ export const appRouter = router({
 
     getById: protectedProcedure
       .input(z.object({ id: z.number() }))
-      .query(async ({ ctx, input }) => {
+      .query(async ({ input }) => {
         const ticket = await db.getTicketById(input.id);
-        if (!ticket)
-          throw new TRPCError({ code: "NOT_FOUND", message: "Não encontrado" });
+        if (!ticket) throw new TRPCError({ code: "NOT_FOUND" });
         return ticket;
       }),
 
-    listAll: adminProcedure.query(async () => {
-      return await db.getAllTickets();
-    }),
+    listAll: adminProcedure.query(async () => await db.getAllTickets()),
   }),
 
   payments: router({
@@ -236,33 +242,18 @@ export const appRouter = router({
             ticketId: input.ticketId,
             comprovantePath: upload.secure_url,
             status: "pending",
+            amount: ticket.amount || 3000,
           });
         }
         return { success: true };
       }),
 
-    getByTicket: protectedProcedure
-      .input(z.object({ ticketId: z.number() }))
-      .query(async ({ input }) => {
-        return await db.getPaymentByTicketId(input.ticketId);
-      }),
-
     listPending: adminProcedure.query(async () => {
       const payments = await db.getPendingPayments();
-      const database = await db.getDb();
-      if (!database) return [];
-
       return await Promise.all(
         payments.map(async p => {
           const ticket = await db.getTicketById(p.ticketId);
-          const user = ticket
-            ? (
-                await database
-                  .select()
-                  .from(users)
-                  .where(eq(users.id, ticket.userId))
-              )[0]
-            : null;
+          const user = ticket ? await db.getUserById(ticket.userId) : null;
           return { ...p, ticket, user };
         })
       );
@@ -329,29 +320,38 @@ export const appRouter = router({
           status: "used",
           validatedAt: new Date(),
         });
+
         await db.createCheckinLog({
           ticketId: ticket.id,
           adminId: ctx.user.id,
           result: "valid",
-          notes: "Check-in OK",
+          notes: ticket.hasCooler ? "Entrou com Cooler" : "Check-in OK",
         });
-        return { valid: true, message: "Acesso Liberado", ticket };
+
+        // Retornamos hasCooler para o frontend mostrar o alerta azul/verde
+        return {
+          valid: true,
+          message: "Acesso Liberado",
+          hasCooler: ticket.hasCooler,
+          ticket,
+        };
       }),
     logs: adminProcedure.query(async () => await db.getCheckinLogs()),
   }),
 
   admin: router({
     dashboard: adminProcedure.query(async () => {
-      const tickets = await db.getAllTickets();
-      const payments = await db.getPendingPayments();
+      const ticketsList = await db.getAllTickets();
+      const paymentsList = await db.getPendingPayments();
       const logs = await db.getCheckinLogs();
       return {
-        totalTickets: tickets.length,
-        pendingTickets: tickets.filter(t => t.status === "pending").length,
-        paidTickets: tickets.filter(t => t.status === "paid").length,
-        usedTickets: tickets.filter(t => t.status === "used").length,
-        cancelledTickets: tickets.filter(t => t.status === "cancelled").length,
-        pendingPayments: payments.length,
+        totalTickets: ticketsList.length,
+        pendingTickets: ticketsList.filter(t => t.status === "pending").length,
+        paidTickets: ticketsList.filter(t => t.status === "paid").length,
+        usedTickets: ticketsList.filter(t => t.status === "used").length,
+        cancelledTickets: ticketsList.filter(t => t.status === "cancelled")
+          .length,
+        pendingPayments: paymentsList.length,
         totalCheckins: logs.filter(l => l.result === "valid").length,
       };
     }),

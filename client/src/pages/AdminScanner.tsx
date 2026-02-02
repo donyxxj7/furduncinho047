@@ -1,9 +1,22 @@
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { APP_LOGO } from "@/const";
 import { trpc } from "@/lib/trpc";
-import { ArrowLeft, Camera, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import {
+  ArrowLeft,
+  Camera,
+  CheckCircle2,
+  XCircle,
+  AlertCircle,
+  Snowflake,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { toast } from "sonner";
@@ -14,18 +27,19 @@ export default function AdminScanner() {
   const [scanning, setScanning] = useState(false);
   const [lastResult, setLastResult] = useState<any>(null);
   const scannerRef = useRef<Html5Qrcode | null>(null);
-  const [cameraId, setCameraId] = useState<string>("");
 
   const validateMutation = trpc.scanner.validate.useMutation({
-    onSuccess: (data) => {
+    onSuccess: data => {
       setLastResult(data);
       if (data.valid) {
-        toast.success("Ingresso válido! Check-in realizado.");
+        // Alerta sonoro ou vibração no celular para agilizar a portaria
+        if (navigator.vibrate) navigator.vibrate(200);
+        toast.success("Ingresso válido!");
       } else {
         toast.error(data.message);
       }
     },
-    onError: (error) => {
+    onError: error => {
       toast.error(error.message || "Erro ao validar QR Code");
     },
   });
@@ -45,8 +59,8 @@ export default function AdminScanner() {
 
       const cameras = await Html5Qrcode.getCameras();
       if (cameras && cameras.length > 0) {
-        const selectedCamera = cameras[cameras.length - 1]; // Prefer back camera
-        setCameraId(selectedCamera.id);
+        // Seleciona a última câmera (geralmente a traseira do celular)
+        const selectedCamera = cameras[cameras.length - 1];
 
         await scanner.start(
           selectedCamera.id,
@@ -54,19 +68,18 @@ export default function AdminScanner() {
             fps: 10,
             qrbox: { width: 250, height: 250 },
           },
-          (decodedText) => {
-            // QR Code detected
+          decodedText => {
             validateMutation.mutate({ qrHash: decodedText });
             scanner.pause(true);
+            // Pausa de 3 segundos para o segurança ver o resultado na tela
             setTimeout(() => {
               if (scanner.isScanning) {
                 scanner.resume();
+                setLastResult(null);
               }
             }, 3000);
           },
-          (errorMessage) => {
-            // Ignore scanning errors (they happen continuously)
-          }
+          () => {}
         );
 
         setScanning(true);
@@ -90,25 +103,21 @@ export default function AdminScanner() {
     }
   };
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
+  if (authLoading) return null;
 
   if (!isAuthenticated || user?.role !== "admin") {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <Card className="max-w-md w-full mx-4">
+      <div className="min-h-screen flex items-center justify-center bg-black p-4">
+        <Card className="max-w-md w-full bg-black/40 border-white/10 text-white">
           <CardHeader>
             <CardTitle>Acesso Negado</CardTitle>
-            <CardDescription>Você não tem permissão para acessar esta página.</CardDescription>
+            <CardDescription>
+              Página restrita para administradores.
+            </CardDescription>
           </CardHeader>
           <CardContent>
             <Link href="/">
-              <Button className="w-full">Voltar para Home</Button>
+              <Button className="w-full">Voltar</Button>
             </Link>
           </CardContent>
         </Card>
@@ -117,131 +126,109 @@ export default function AdminScanner() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="border-b border-border/50 backdrop-blur-sm bg-background/80 sticky top-0 z-50">
+    <div className="min-h-screen bg-black text-white">
+      <header className="border-b border-white/10 bg-black/50 backdrop-blur-md sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/admin">
-            <Button variant="ghost" size="sm">
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Voltar
+            <Button variant="ghost" size="sm" className="text-gray-400">
+              <ArrowLeft className="h-4 w-4 mr-2" /> Voltar
             </Button>
           </Link>
           <div className="flex items-center gap-3">
-            <img src={APP_LOGO} alt="Furduncinho047" className="h-10 w-10 rounded-full" />
-            <h1 className="text-xl font-bold text-primary">Scanner de QR Code</h1>
+            <img
+              src={APP_LOGO}
+              alt="Logo"
+              className="h-10 w-10 rounded-full border border-white/10"
+            />
+            <h1 className="text-xl font-bold">Portaria 047</h1>
           </div>
           <div className="w-20"></div>
         </div>
       </header>
 
-      <div className="container mx-auto px-4 py-12">
-        <div className="max-w-2xl mx-auto">
-          <h2 className="text-3xl font-bold mb-8 text-center">Scanner de Ingressos</h2>
-
-          {/* Scanner Card */}
-          <Card className="border-primary/20 mb-6">
-            <CardHeader>
-              <CardTitle>Câmera</CardTitle>
-              <CardDescription>
-                Aponte a câmera para o QR Code do ingresso
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div
-                  id="qr-reader"
-                  className="w-full rounded-lg overflow-hidden border border-border"
-                  style={{ minHeight: scanning ? "300px" : "0" }}
-                ></div>
-
-                {!scanning ? (
-                  <Button onClick={startScanning} className="w-full" size="lg">
-                    <Camera className="mr-2 h-5 w-5" />
-                    Iniciar Scanner
-                  </Button>
-                ) : (
-                  <Button onClick={stopScanning} variant="destructive" className="w-full" size="lg">
-                    Parar Scanner
-                  </Button>
-                )}
+      <div className="container mx-auto px-4 py-8">
+        <div className="max-w-md mx-auto space-y-6">
+          {/* ÁREA DA CÂMERA */}
+          <div className="relative aspect-square overflow-hidden rounded-3xl border-2 border-purple-500/30 bg-white/5 shadow-[0_0_50px_rgba(168,85,247,0.1)]">
+            <div id="qr-reader" className="w-full h-full"></div>
+            {!scanning && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 gap-4">
+                <Button
+                  onClick={startScanning}
+                  size="lg"
+                  className="bg-purple-600 hover:bg-purple-500 font-bold px-8"
+                >
+                  <Camera className="mr-2 h-6 w-6" /> ATIVAR CÂMERA
+                </Button>
               </div>
-            </CardContent>
-          </Card>
+            )}
+            {scanning && (
+              <div className="absolute inset-0 border-[40px] border-black/40 pointer-events-none"></div>
+            )}
+          </div>
 
-          {/* Result Card */}
+          {/* RESULTADO COM ALERTA DE COOLER */}
           {lastResult && (
             <Card
-              className={`border-2 ${
+              className={`border-4 animate-in zoom-in duration-300 ${
                 lastResult.valid
-                  ? "border-green-500 bg-green-500/5"
-                  : "border-red-500 bg-red-500/5"
+                  ? lastResult.hasCooler
+                    ? "bg-blue-600/20 border-blue-500 shadow-[0_0_30px_rgba(59,130,246,0.3)]"
+                    : "bg-green-600/20 border-green-500 shadow-[0_0_30px_rgba(34,197,94,0.3)]"
+                  : "bg-red-600/20 border-red-500"
               }`}
             >
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+              <CardHeader className="text-center">
+                <div className="flex justify-center mb-2">
                   {lastResult.valid ? (
-                    <>
-                      <CheckCircle2 className="h-6 w-6 text-green-500" />
-                      <span className="text-green-500">Ingresso Válido</span>
-                    </>
-                  ) : lastResult.result === "used" ? (
-                    <>
-                      <AlertCircle className="h-6 w-6 text-yellow-500" />
-                      <span className="text-yellow-500">Ingresso Já Utilizado</span>
-                    </>
+                    lastResult.hasCooler ? (
+                      <Snowflake className="h-12 w-12 text-blue-400 animate-pulse" />
+                    ) : (
+                      <CheckCircle2 className="h-12 w-12 text-green-400" />
+                    )
                   ) : (
-                    <>
-                      <XCircle className="h-6 w-6 text-red-500" />
-                      <span className="text-red-500">Ingresso Inválido</span>
-                    </>
-                  )}
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <p className="text-lg font-semibold">{lastResult.message}</p>
-
-                  {lastResult.ticket && (
-                    <div className="bg-background/50 p-4 rounded-lg space-y-2">
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Código:</span>
-                        <span className="font-medium">{lastResult.ticket.ticketCode}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">Ingresso ID:</span>
-                        <span className="font-medium">#{lastResult.ticket.id}</span>
-                      </div>
-                      {lastResult.ticket.validatedAt && (
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Validado em:</span>
-                          <span className="font-medium">
-                            {new Date(lastResult.ticket.validatedAt).toLocaleString("pt-BR")}
-                          </span>
-                        </div>
-                      )}
-                    </div>
+                    <XCircle className="h-12 w-12 text-red-500" />
                   )}
                 </div>
-              </CardContent>
+                <CardTitle className="text-3xl font-black text-white">
+                  {lastResult.valid
+                    ? lastResult.hasCooler
+                      ? "COM COOLER"
+                      : "LIBERADO"
+                    : "BLOQUEADO"}
+                </CardTitle>
+                <CardDescription className="text-white font-bold opacity-90">
+                  {lastResult.message}
+                </CardDescription>
+              </CardHeader>
+              {lastResult.ticket && (
+                <CardContent className="bg-black/40 mx-4 mb-4 rounded-xl p-4 border border-white/10">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-400">ID Pedido:</span>
+                    <span className="font-mono font-bold">
+                      #{lastResult.ticket.id}
+                    </span>
+                  </div>
+                  <div className="flex justify-between text-sm mt-1">
+                    <span className="text-gray-400">Valor Pago:</span>
+                    <span className="font-bold">
+                      R$ {(lastResult.ticket.amount / 100).toFixed(2)}
+                    </span>
+                  </div>
+                </CardContent>
+              )}
             </Card>
           )}
 
-          {/* Instructions */}
-          <Card className="border-primary/20 mt-6">
-            <CardHeader>
-              <CardTitle>Instruções</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2 text-sm text-muted-foreground">
-                <li>1. Clique em "Iniciar Scanner" para ativar a câmera</li>
-                <li>2. Aponte a câmera para o QR Code do ingresso</li>
-                <li>3. O sistema validará automaticamente o ingresso</li>
-                <li>4. Ingressos válidos serão marcados como "utilizados"</li>
-                <li>5. Ingressos já utilizados não podem ser validados novamente</li>
-              </ul>
-            </CardContent>
-          </Card>
+          {scanning && (
+            <Button
+              onClick={stopScanning}
+              variant="ghost"
+              className="w-full text-red-500 hover:text-red-400 hover:bg-red-500/10"
+            >
+              Desativar Câmera
+            </Button>
+          )}
         </div>
       </div>
     </div>

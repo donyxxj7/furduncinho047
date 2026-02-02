@@ -10,6 +10,7 @@ import SubmitProof from "./pages/SubmitProof";
 import MyTickets from "./pages/MyTickets";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminPayments from "./pages/AdminPayments";
+// Certifique-se de que o arquivo criado anteriormente se chama Scanner.tsx ou AdminScanner.tsx
 import AdminScanner from "./pages/AdminScanner";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -17,7 +18,7 @@ import Register from "./pages/Register";
 function Router() {
   return (
     <Switch>
-      <Route path={"/"} component={Home} />
+      <Route path="/" component={Home} />
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
 
@@ -25,11 +26,12 @@ function Router() {
       <Route path="/enviar-comprovante/:ticketId" component={SubmitProof} />
       <Route path="/meus-ingressos" component={MyTickets} />
 
+      {/* ROTAS ADMINISTRATIVAS */}
       <Route path="/admin" component={AdminDashboard} />
       <Route path="/admin/pagamentos" component={AdminPayments} />
       <Route path="/admin/scanner" component={AdminScanner} />
 
-      <Route path={"/404"} component={NotFound} />
+      <Route path="/404" component={NotFound} />
       <Route component={NotFound} />
     </Switch>
   );

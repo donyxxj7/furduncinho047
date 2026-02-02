@@ -1,5 +1,5 @@
 import "dotenv/config";
-import * as schema from "../drizzle/schema";
+import * as schema from "../src/db/schema";
 import { drizzle } from "drizzle-orm/mysql2";
 import mysql from "mysql2/promise";
 import bcrypt from "bcrypt";

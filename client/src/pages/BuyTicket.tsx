@@ -30,7 +30,7 @@ import { toast } from "sonner";
 import { useState } from "react";
 
 const PIX_INFO = {
-  chave: "47997051529",
+  chave: "47996979192",
   nome: "Endony Paradela Rodrigues",
   banco: "Mercado Pago",
 };
@@ -42,6 +42,9 @@ export default function BuyTicket() {
   const [createdTicketId, setCreatedTicketId] = useState<number | null>(null);
   const [isSuccessOpen, setIsSuccessOpen] = useState(false);
 
+  // ESTADO DO COOLER: Gerencia a escolha do usuário
+  const [includeCooler, setIncludeCooler] = useState(false);
+
   const { data: tickets, isLoading: ticketsLoading } =
     trpc.tickets.myTickets.useQuery(undefined, {
       enabled: isAuthenticated,
@@ -49,9 +52,11 @@ export default function BuyTicket() {
 
   const createTicketMutation = trpc.tickets.create.useMutation({
     onSuccess: data => {
-      setCreatedTicketId(data.ticketId);
-      setIsSuccessOpen(true);
-      toast.success("Pedido gerado com sucesso!");
+      if (data.success && data.ticketId) {
+        setCreatedTicketId(data.ticketId);
+        setIsSuccessOpen(true);
+        toast.success("Pedido gerado com sucesso!");
+      }
     },
     onError: error => toast.error(error.message || "Erro ao criar ingresso"),
   });
@@ -75,6 +80,9 @@ export default function BuyTicket() {
     const text = `Olá, segue o ID do meu pagamento para o Furduncinho047: Pedido #${id}`;
     return `https://wa.me/${phone}?text=${encodeURIComponent(text)}`;
   };
+
+  // CÁLCULO DINÂMICO DO TOTAL
+  const totalAmount = includeCooler ? 70 : 30;
 
   if (authLoading || ticketsLoading)
     return (
@@ -170,24 +178,55 @@ export default function BuyTicket() {
             </Card>
           ) : (
             <>
+              {/* OPÇÃO DE COOLER */}
+              <Card
+                onClick={() => setIncludeCooler(!includeCooler)}
+                className={`bg-white/5 backdrop-blur-xl mb-6 text-white cursor-pointer border transition-all hover:scale-[1.01] ${
+                  includeCooler
+                    ? "border-purple-500 shadow-[0_0_15px_rgba(168,85,247,0.2)]"
+                    : "border-white/10"
+                }`}
+              >
+                <CardHeader className="flex flex-row items-center justify-between py-4">
+                  <div>
+                    <CardTitle className="text-lg">
+                      Taxa de Cooler (Opcional)
+                    </CardTitle>
+                    <CardDescription className="text-gray-400">
+                      Leve suas próprias bebidas por + R$ 40,00
+                    </CardDescription>
+                  </div>
+                  <div
+                    className={`h-6 w-6 rounded-full border-2 flex items-center justify-center ${includeCooler ? "bg-purple-500 border-purple-400" : "border-white/20"}`}
+                  >
+                    {includeCooler && (
+                      <div className="h-2 w-2 bg-white rounded-full" />
+                    )}
+                  </div>
+                </CardHeader>
+              </Card>
+
               <Card className="bg-white/5 border-white/10 backdrop-blur-xl mb-6 text-white">
                 <CardHeader>
                   <CardTitle className="text-purple-300">
                     Resumo do Pedido
                   </CardTitle>
-                  <CardDescription className="text-gray-400">
-                    Entrada Furduncinho047
-                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex justify-between border-b border-white/10 py-3">
                     <span className="text-gray-400">Ingresso Access</span>
-                    <span className="font-bold text-white">1 Unidade</span>
+                    <span className="font-bold text-white">R$ 30,00</span>
                   </div>
+                  {includeCooler && (
+                    <div className="flex justify-between border-b border-white/10 py-3">
+                      <span className="text-gray-400">Taxa de Cooler</span>
+                      <span className="font-bold text-white">R$ 40,00</span>
+                    </div>
+                  )}
                   <div className="flex justify-between py-3 items-center">
                     <span className="text-lg font-bold">Total</span>
                     <span className="text-3xl font-black text-purple-400 drop-shadow-[0_0_10px_rgba(168,85,247,0.5)]">
-                      R$ 25,00
+                      R$ {totalAmount},00
                     </span>
                   </div>
                 </CardContent>
@@ -262,7 +301,10 @@ export default function BuyTicket() {
 
               <Button
                 className="w-full h-16 text-xl font-bold bg-green-600 hover:bg-green-500 text-white rounded-xl shadow-[0_0_25px_rgba(34,197,94,0.4)] transition-all hover:scale-[1.02] border border-green-400/30"
-                onClick={() => createTicketMutation.mutate()}
+                // CORREÇÃO: Passando o objeto com a escolha do cooler
+                onClick={() =>
+                  createTicketMutation.mutate({ hasCooler: includeCooler })
+                }
                 disabled={createTicketMutation.isPending}
               >
                 {createTicketMutation.isPending
@@ -344,7 +386,6 @@ export default function BuyTicket() {
               </Button>
             </div>
 
-            {/* AQUI NÃO TEM MAIS O "OU" */}
             <div className="w-full border-t border-white/10 my-2"></div>
 
             <Button

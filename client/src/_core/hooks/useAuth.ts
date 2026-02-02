@@ -12,12 +12,14 @@ export function useAuth(options: { redirectOnUnauthenticated?: boolean } = {}) {
     error,
   } = trpc.auth.me.useQuery(undefined, {
     retry: false,
+    staleTime: 1000 * 60 * 5, // Cache de 5 minutos
   });
 
   // Mutação de Login
   const loginMutation = trpc.auth.login.useMutation({
     onSuccess: () => {
-      utils.auth.me.invalidate(); // Recarrega os dados do usuário
+      utils.auth.me.invalidate();
+      setLocation("/"); // Redireciona após login
     },
   });
 
@@ -25,6 +27,7 @@ export function useAuth(options: { redirectOnUnauthenticated?: boolean } = {}) {
   const registerMutation = trpc.auth.register.useMutation({
     onSuccess: () => {
       utils.auth.me.invalidate();
+      setLocation("/"); // Redireciona após registro
     },
   });
 
@@ -36,9 +39,7 @@ export function useAuth(options: { redirectOnUnauthenticated?: boolean } = {}) {
     },
   });
 
-  // Redirecionamento automático se não estiver logado
   if (options.redirectOnUnauthenticated && !isLoading && !user) {
-    // Evita loop infinito se já estiver no login
     if (
       window.location.pathname !== "/login" &&
       window.location.pathname !== "/register"
@@ -50,8 +51,8 @@ export function useAuth(options: { redirectOnUnauthenticated?: boolean } = {}) {
   return {
     user,
     loading: isLoading || loginMutation.isPending || registerMutation.isPending,
-    isAuthenticated: !!user,
-    // Expõe as funções para as páginas usarem
+    // Alterado para garantir que o objeto usuário contenha o campo openid
+    isAuthenticated: !!user?.openid,
     login: (email: string, password: string) =>
       loginMutation.mutateAsync({ email, password }),
     register: (name: string, email: string, password: string) =>

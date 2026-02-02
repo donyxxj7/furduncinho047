@@ -1,43 +1,39 @@
-import mysql from "mysql2/promise";
+import postgres from "postgres";
+import "dotenv/config";
 
-// O ID da sua conta ADMIN, de acordo com a imagem
-const ADMIN_ID = 150003;
+// O ID da sua conta ADMIN no Neon (Verifique no Drizzle Studio se o ID mudou)
+const ADMIN_ID = 1;
 
 async function deleteTestUsers() {
-  console.log("Conectando ao TiDB Cloud para deletar usuários...");
+  const databaseUrl = process.env.DATABASE_URL;
 
-  let connection;
+  if (!databaseUrl) {
+    console.error("❌ Erro: DATABASE_URL não encontrada no arquivo .env");
+    return;
+  }
+
+  console.log("Conectando ao Neon para limpar usuários...");
+
+  // Criamos a conexão usando o driver de Postgres
+  const sql = postgres(databaseUrl, { ssl: "require" });
+
   try {
-    connection = await mysql.createConnection({
-      host: "gateway02.us-east-1.prod.aws.tidbcloud.com",
-      port: 4000,
-      user: "228TB7rmHcwk69v.root",
-      password: "lyOk7e704X3c1EdzUpUv",
-      database: "furduncinho047",
-      ssl: {
-        rejectUnauthorized: true,
-      },
-    });
+    console.log(`Conectado! Deletando usuários (exceto ID: ${ADMIN_ID})...`);
 
-    console.log("Conectado! Deletando todas as contas (exceto o admin)...");
-
-    // --- CORREÇÃO ---
-    // Agora vamos deletar usando o 'id' em vez do 'openId'
-    // Isso vai funcionar 100%
-    const [result] = await connection.query(
-      "DELETE FROM users WHERE id != ?;",
-      [ADMIN_ID]
-    );
-    // --- FIM DA CORREÇÃO ---
+    // No Postgres a query de deleção é igual, mas o retorno do driver muda
+    const result = await sql`
+      DELETE FROM users 
+      WHERE id != ${ADMIN_ID}
+    `;
 
     console.log("✅ Sucesso! Limpeza concluída.");
-    console.log(result); // Isso deve mostrar 'affectedRows: 1'
-
-    await connection.end();
+    console.log(`Linhas afetadas: ${result.count}`);
   } catch (err) {
     console.error("❌ Erro ao tentar deletar usuários:");
     console.error(err);
     process.exit(1);
+  } finally {
+    await sql.end();
   }
 }
 
