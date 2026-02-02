@@ -1,16 +1,17 @@
-import { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
-import { getSessionCookieOptions } from "./_core/cookies";
-import { systemRouter } from "./_core/systemRouter";
-import { publicProcedure, protectedProcedure, router } from "./_core/trpc";
+// server/routers.ts
+import { COOKIE_NAME, ONE_YEAR_MS } from "../shared/const.js";
+import { getSessionCookieOptions } from "./_core/cookies.js";
+import { systemRouter } from "./_core/systemRouter.js";
+import { publicProcedure, protectedProcedure, router } from "./_core/trpc.js";
 import { z } from "zod";
-import * as db from "./db";
-import { users, tickets } from "../src/db/schema";
+import * as db from "./db.js";
+import { users, tickets } from "../src/db/schema.js";
 import { eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import crypto from "crypto";
 import QRCode from "qrcode";
 import bcrypt from "bcrypt";
-import { sdk } from "./_core/sdk";
+import { sdk } from "./_core/sdk.js";
 import { v2 as cloudinary } from "cloudinary";
 
 cloudinary.config({
@@ -328,7 +329,6 @@ export const appRouter = router({
           notes: ticket.hasCooler ? "Entrou com Cooler" : "Check-in OK",
         });
 
-        // Retornamos hasCooler para o frontend mostrar o alerta azul/verde
         return {
           valid: true,
           message: "Acesso Liberado",
