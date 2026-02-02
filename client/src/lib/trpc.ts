@@ -7,8 +7,9 @@ export const trpc = createTRPCReact<AppRouter>();
 
 // Define a URL base: usa a variável da Vercel ou o caminho relativo
 const getBaseUrl = () => {
-  if (import.meta.env.VITE_TRPC_URL) return import.meta.env.VITE_TRPC_URL; // Usa a variável que vamos por na Vercel
-  return ""; // Em produção na Vercel, o caminho relativo funciona melhor
+  // Se estivermos no navegador (produção Vercel), o caminho vazio ""
+  // faz o tRPC usar o próprio domínio do site automaticamente.
+  return "";
 };
 
 export const trpcClient = trpc.createClient({
