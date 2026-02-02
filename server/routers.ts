@@ -1,3 +1,4 @@
+// server/routers.ts
 import { COOKIE_NAME, ONE_YEAR_MS } from "../shared/const.js";
 import { getSessionCookieOptions } from "./_core/cookies.js";
 import { systemRouter } from "./_core/systemRouter.js";
@@ -39,6 +40,7 @@ const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
 
 export const appRouter = router({
   system: systemRouter,
+
   auth: router({
     register: publicProcedure
       .input(
@@ -55,9 +57,11 @@ export const appRouter = router({
             code: "BAD_REQUEST",
             message: "Email em uso.",
           });
+
         const passwordHash = await bcrypt.hash(input.password, 10);
         const dbInstance = await db.getDb();
         if (!dbInstance) throw new Error("DB offline");
+
         const newUserResult = await dbInstance
           .insert(users)
           .values({
@@ -68,23 +72,27 @@ export const appRouter = router({
             openid: `temp_${Date.now()}`,
           })
           .returning({ id: users.id });
+
         const newUserId = newUserResult[0]?.id;
         const fakeOpenId = `local_user_${newUserId}`;
         await dbInstance
           .update(users)
           .set({ openid: fakeOpenId })
           .where(eq(users.id, newUserId));
+
         const sessionToken = await sdk.signSession({
           openId: fakeOpenId,
           appId: "furduncinho",
           name: input.name,
         });
+
         ctx.res.cookie(COOKIE_NAME, sessionToken, {
           ...getSessionCookieOptions(ctx.req),
           maxAge: ONE_YEAR_MS,
         });
         return { success: true };
       }),
+
     login: publicProcedure
       .input(z.object({ email: z.string().email(), password: z.string() }))
       .mutation(async ({ input, ctx }) => {
@@ -110,8 +118,16 @@ export const appRouter = router({
         });
         return { success: true, user };
       }),
+
     me: publicProcedure.query(opts => opts.ctx.user),
+
+    logout: publicProcedure.mutation(({ ctx }) => {
+      const cookieOptions = getSessionCookieOptions(ctx.req);
+      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions });
+      return { success: true };
+    }),
   }),
+
   tickets: router({
     create: protectedProcedure
       .input(z.object({ hasCooler: z.boolean() }))
@@ -125,6 +141,7 @@ export const appRouter = router({
         });
         return { success: true, ticketId: result?.[0]?.insertedId };
       }),
+
     getById: protectedProcedure
       .input(z.object({ id: z.number() }))
       .query(async ({ input }) => {
@@ -132,6 +149,7 @@ export const appRouter = router({
         if (!ticket) throw new TRPCError({ code: "NOT_FOUND" });
         return ticket;
       }),
+
     myTickets: protectedProcedure.query(async ({ ctx }) => {
       const tks = await db.getTicketsByUserId(ctx.user.id);
       return Promise.all(
@@ -142,7 +160,6 @@ export const appRouter = router({
       );
     }),
   }),
-  // server/routers.ts
 
   payments: router({
     submitProof: protectedProcedure
@@ -156,10 +173,12 @@ export const appRouter = router({
       .mutation(async ({ ctx, input }) => {
         const ticket = await db.getTicketById(input.ticketId);
         if (!ticket) throw new TRPCError({ code: "BAD_REQUEST" });
+
         const upload = await cloudinary.uploader.upload(
           `data:${input.proofMimeType};base64,${input.proofData}`,
           { folder: "furduncinho/comprovantes" }
         );
+
         const existing = await db.getPaymentByTicketId(input.ticketId);
         if (existing) {
           await db.updatePayment(existing.id, {
@@ -177,7 +196,6 @@ export const appRouter = router({
         return { success: true };
       }),
 
-    // --- ADICIONE ESTAS TRÊS ROTAS ABAIXO PARA LIMPAR O ERRO 404 ---
     listPending: adminProcedure.query(async () => {
       const payments = await db.getPendingPayments();
       return await Promise.all(
@@ -199,10 +217,16 @@ export const appRouter = router({
         if (!ticket) throw new TRPCError({ code: "NOT_FOUND" });
 
         const qrHash = generateQrHash(ticket.id, ticket.userId);
+        const qrDataUrl = await QRCode.toDataURL(qrHash);
+        const upload = await cloudinary.uploader.upload(qrDataUrl, {
+          folder: "furduncinho/qrcodes",
+        });
+
         await db.updateTicket(ticket.id, {
           status: "paid",
           qrCodeHash: qrHash,
           ticketCode: generateTicketCode(),
+          qrImagePath: upload.secure_url,
           generatedAt: new Date(),
         });
         await db.updatePayment(payment.id, {
@@ -226,14 +250,13 @@ export const appRouter = router({
       }),
   }),
 
-  // --- ADICIONE ESTES BLOCOS AQUI EMBAIXO ---
   scanner: router({
     validate: adminProcedure
       .input(z.object({ qrHash: z.string() }))
       .mutation(async ({ ctx, input }) => {
         const ticket = await db.getTicketByQrHash(input.qrHash);
         if (!ticket || ticket.status !== "paid")
-          return { valid: false, message: "Inválido" };
+          return { valid: false, message: "Inválido ou já utilizado" };
 
         await db.updateTicket(ticket.id, {
           status: "used",
@@ -256,13 +279,20 @@ export const appRouter = router({
       const ticketsList = await db.getAllTickets();
       const paymentsList = await db.getPendingPayments();
       const logs = await db.getCheckinLogs();
+
+      // --- AQUI ESTÁ A DECLARAÇÃO QUE FALTAVA ---
+      const paidTickets = ticketsList.filter(
+        t => t.status === "paid" || t.status === "used"
+      ).length;
+
       return {
         totalTickets: ticketsList.length,
         pendingPayments: paymentsList.length,
         totalCheckins: logs.filter(l => l.result === "valid").length,
+        paidTickets, // Agora o valor existe no escopo!
       };
     }),
   }),
-}); // ESTA CHAVE FECHA O appRouter
+});
 
 export type AppRouter = typeof appRouter;

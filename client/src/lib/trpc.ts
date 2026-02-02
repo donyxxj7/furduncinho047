@@ -1,25 +1,19 @@
 import { createTRPCReact } from "@trpc/react-query";
-import type { AppRouter } from "../../../server/routers";
+import type { AppRouter } from "../../../server/routers.js";
 import { httpBatchLink } from "@trpc/client";
-import superjson from "superjson";
+import superjson from "superjson"; // Importe o superjson
 
 export const trpc = createTRPCReact<AppRouter>();
 
-// Define a URL base: usa a variável da Vercel ou o caminho relativo
 const getBaseUrl = () => {
-  // Se estivermos no navegador (produção Vercel), o caminho vazio ""
-  // faz o tRPC usar o próprio domínio do site automaticamente.
   return "";
 };
 
 export const trpcClient = trpc.createClient({
   links: [
     httpBatchLink({
-      transformer: superjson,
-      url: `${getBaseUrl()}/api/trpc`, // Agora a URL se ajusta sozinha!
-      async headers() {
-        return {};
-      },
+      transformer: superjson, // Adicione o transformer aqui
+      url: `${getBaseUrl()}/api/trpc`,
     }),
   ],
 });
