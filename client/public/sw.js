@@ -1,5 +1,5 @@
 const CACHE_NAME = "furduncinho-v1";
-const urlsToCache = ["/", "/logo.png", "/manifest.json"];
+const urlsToCache = ["/", "/logo.webp", "/manifest.json"];
 
 // Instalação do Service Worker
 self.addEventListener("install", event => {

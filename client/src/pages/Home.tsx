@@ -1,9 +1,10 @@
+import { useMemo } from "react"; // Otimização de cálculos [cite: 2025-06-07]
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Countdown } from "@/components/Countdown";
 import { APP_LOGO } from "@/const";
 import { trpc } from "@/lib/trpc";
-import { useIsMobile } from "@/hooks/useMobile"; // IMPORTADO O HOOK
+import { useIsMobile } from "@/hooks/useMobile";
 import {
   Calendar,
   MapPin,
@@ -17,13 +18,16 @@ import { Link } from "wouter";
 
 export default function Home() {
   const { user, loading: authLoading, isAuthenticated, logout } = useAuth();
-  const isMobile = useIsMobile(); // DETECTA SE É CELULAR
+  const isMobile = useIsMobile();
 
   const { data: settings, isLoading: settingsLoading } =
     trpc.settings.get.useQuery();
 
-  const formatDate = (dateString?: string) => {
+  // 1. MEMOIZAÇÃO DA DATA: Evita que a função de formatação rode em todo render [cite: 2025-06-07]
+  const eventDate = useMemo(() => {
+    const dateString = settings?.eventDate;
     if (!dateString) return { dia: "07", mes: "FEV", ano: "2026" };
+
     const date = new Date(dateString);
     const meses = [
       "JAN",
@@ -39,14 +43,22 @@ export default function Home() {
       "NOV",
       "DEZ",
     ];
+
     return {
       dia: date.getDate().toString().padStart(2, "0"),
       mes: meses[date.getMonth()],
       ano: date.getFullYear(),
     };
-  };
+  }, [settings?.eventDate]);
 
-  const eventDate = formatDate(settings?.eventDate);
+  // 2. MEMOIZAÇÃO DO NOME: Divide o nome apenas quando ele mudar [cite: 2025-06-07]
+  const eventNameParts = useMemo(() => {
+    const parts = settings?.eventName?.split(" ") || ["FURDUNCINHO", "047"];
+    return {
+      first: parts[0],
+      second: parts[1] || "",
+    };
+  }, [settings?.eventName]);
 
   if (authLoading || settingsLoading) {
     return (
@@ -58,36 +70,33 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-black text-white overflow-x-hidden selection:bg-purple-500/30">
-      <div className="fixed inset-0 z-0 pointer-events-none">
+      {/* 3. OTIMIZAÇÃO DE BACKGROUND: Uso de 'will-change' para performance de GPU [cite: 2025-06-07] */}
+      <div className="fixed inset-0 z-0 pointer-events-none will-change-transform">
         <div className="absolute top-[-10%] left-[20%] w-[500px] h-[500px] bg-purple-600/20 blur-[120px] rounded-full mix-blend-screen animate-pulse"></div>
       </div>
 
-      {/* HEADER CORRIGIDO COM RESPONSIVIDADE [cite: 2025-06-07] */}
       <header className="fixed top-0 left-0 right-0 z-50 border-b border-white/5 bg-black/50 backdrop-blur-md">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between gap-2">
-          {/* Logo e Nome do Evento com ajuste de espaço */}
           <div className="flex items-center gap-2 md:gap-3 min-w-0 shrink">
             <img
               src={APP_LOGO}
               alt="Logo"
+              loading="eager" // Carrega o logo imediatamente (LCP)
               className="h-8 w-8 md:h-12 md:w-12 rounded-full border border-white/10 shrink-0"
             />
             <h1 className="text-sm md:text-xl font-bold text-white tracking-wider uppercase truncate">
-              {settings?.eventName?.split(" ")[0] || "Furduncinho"}
-              <span className="text-purple-500">
-                {settings?.eventName?.split(" ")[1] || "047"}
-              </span>
+              {eventNameParts.first}{" "}
+              <span className="text-purple-500">{eventNameParts.second}</span>
             </h1>
           </div>
 
-          {/* Navegação que não encolhe para não quebrar o layout */}
           <nav className="flex items-center gap-1 md:gap-3 shrink-0">
             {isAuthenticated ? (
               <>
                 <Link href="/meus-ingressos">
                   <Button
                     variant="ghost"
-                    className="text-gray-300 h-9 px-2 md:px-4"
+                    className="text-gray-300 h-9 px-2 md:px-4 transition-colors"
                   >
                     <Ticket className="h-4 w-4 md:mr-2" />
                     <span className="hidden md:inline">Ingressos</span>
@@ -97,7 +106,7 @@ export default function Home() {
                   <Link href="/admin">
                     <Button
                       variant="ghost"
-                      className="text-purple-400 h-9 px-2 md:px-4"
+                      className="text-purple-400 h-9 px-2 md:px-4 transition-colors"
                     >
                       <ShieldCheck className="h-4 w-4 md:mr-2" />
                       <span className="hidden md:inline">Admin</span>
@@ -107,8 +116,8 @@ export default function Home() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  onClick={() => logout()}
-                  className="text-gray-400 h-9 w-9"
+                  onClick={logout}
+                  className="text-gray-400 h-9 w-9 hover:text-red-400"
                 >
                   <LogOut className="h-4 w-4" />
                 </Button>
@@ -142,11 +151,10 @@ export default function Home() {
 
           <h1 className="text-4xl md:text-7xl lg:text-8xl font-black tracking-tighter mb-6 leading-[0.9]">
             <span className="block text-transparent bg-clip-text bg-gradient-to-b from-white to-gray-400">
-              {settings?.eventName?.split(" ")[0].toUpperCase() ||
-                "FURDUNCINHO"}
+              {eventNameParts.first.toUpperCase()}
             </span>
             <span className="block text-transparent bg-clip-text bg-gradient-to-r from-purple-500 via-fuchsia-500 to-purple-500">
-              {settings?.eventName?.split(" ")[1] || "047"}
+              {eventNameParts.second}
             </span>
           </h1>
 
@@ -157,7 +165,8 @@ export default function Home() {
             </strong>
           </p>
 
-          <div className="mb-12 scale-75 md:scale-100">
+          {/* 4. RESERVA DE ESPAÇO: Evita que o layout 'pule' ao carregar o contador (CLS) */}
+          <div className="mb-12 scale-75 md:scale-100 min-h-[100px] flex items-center justify-center">
             <Countdown />
           </div>
 
@@ -173,7 +182,6 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Info Cards dinâmicos mantidos */}
       <section className="py-12 md:py-20 relative z-10">
         <div className="container mx-auto px-4">
           <div className="grid md:grid-cols-3 gap-4 md:gap-6 max-w-6xl mx-auto">
@@ -207,8 +215,9 @@ export default function Home() {
                 R$ {settings ? (settings.priceNormal / 100).toFixed(0) : "0"}
               </p>
               <Link href={isAuthenticated ? "/comprar" : "/login"}>
-                <div className="flex items-center text-purple-400 text-xs font-bold mt-4 hover:text-white transition-colors cursor-pointer">
-                  Garantir agora <ChevronRight className="h-4 w-4 ml-1" />
+                <div className="flex items-center text-purple-400 text-xs font-bold mt-4 hover:text-white transition-colors cursor-pointer group">
+                  Garantir agora{" "}
+                  <ChevronRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
                 </div>
               </Link>
             </div>
