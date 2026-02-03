@@ -116,8 +116,8 @@ export default function Home() {
                 <Button
                   variant="ghost"
                   size="icon"
+                  aria-label="Sair da conta"
                   onClick={logout}
-                  className="text-gray-400 h-9 w-9 hover:text-red-400"
                 >
                   <LogOut className="h-4 w-4" />
                 </Button>

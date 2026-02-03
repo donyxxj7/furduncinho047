@@ -1,0 +1,9 @@
+# RESOLVE O ERRO DE RASTREAMENTO E INDEXAÇÃO
+User-agent: *
+Allow: /
+
+# Bloqueia apenas a área administrativa de aparecer no Google
+Disallow: /admin
+Disallow: /admin/*
+
+Sitemap: https://furduncinho047-2026.vercel.app/sitemap.xml
