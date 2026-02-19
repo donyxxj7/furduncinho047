@@ -1,0 +1,28 @@
+{
+  "name": "Furduncinho047",
+  "short_name": "Furduncinho",
+  "description": "O maior encontro automotivo de Santa Catarina. Garanta seu ingresso!",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#a855f7",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/logo.webp",
+      "sizes": "200x200",
+      "type": "image/webp",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["events", "entertainment"],
+  "screenshots": [
+    {
+      "src": "/logo.webp",
+      "sizes": "200x200",
+      "type": "image/webp",
+      "form_factor": "narrow",
+      "label": "Home do Furduncinho047"
+    }
+  ]
+}
