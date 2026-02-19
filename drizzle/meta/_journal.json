@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 {
   "version": "7",
   "dialect": "postgresql",
@@ -18,3 +19,6 @@
     }
   ]
 }
+=======
+{"version":"7","dialect":"postgresql","entries":[]}
+>>>>>>> 4644ff86a38836c104a5baeada054f71978321eb
