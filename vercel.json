@@ -1,13 +1,13 @@
 {
   "version": 2,
   "rewrites": [
-    { "source": "/api/trpc/:path*", "destination": "/api/index.ts" },
-    { "source": "/api/:path*", "destination": "/api/index.ts" },
+    { "source": "/api/trpc/:path*", "destination": "/api/index.js" },
+    { "source": "/api/:path*", "destination": "/api/index.js" },
     { "source": "/((?!api/).*)", "destination": "/dist/index.html" }
   ],
   "functions": {
-    "api/index.ts": {
-      "includeFiles": "server/**"
+    "api/index.js": {
+      "includeFiles": ["server/**", "dist/**"]
     }
   }
 }
