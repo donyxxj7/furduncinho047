@@ -7,7 +7,7 @@
   ],
   "functions": {
     "api/index.js": {
-      "includeFiles": ["server/**", "dist/**"]
+      "includeFiles": "{server/**,dist/**}"
     }
   }
 }
