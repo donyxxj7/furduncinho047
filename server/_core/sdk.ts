@@ -9,7 +9,6 @@ import type { Request } from "express";
 import { SignJWT, jwtVerify } from "jose";
 import * as db from "../db.js";
 import { ENV } from "./env.js";
-
 // --- MUDANÇA AQUI ---
 import { users } from "../../src/db/schema.js"; // Importa a tabela
 import { type InferSelectModel } from "drizzle-orm"; // Importa o utilitário de tipo
@@ -106,7 +105,11 @@ class SDKServer {
   }
 
   async authenticateRequest(req: Request): Promise<User> {
-    const cookies = this.parseCookies(req.headers.cookie);
+    // FIX VERCEL: Usamos (req as any) para evitar o erro TS2339 no build rigoroso
+    const request = req as any;
+
+    // Agora o TS não vai reclamar do .headers
+    const cookies = this.parseCookies(request.headers?.cookie);
     const sessionCookie = cookies.get(COOKIE_NAME);
     const session = await this.verifySession(sessionCookie);
 
