@@ -19,14 +19,13 @@ import bcrypt from "bcrypt";
 import { sdk } from "./_core/sdk.js";
 import { v2 as cloudinary } from "cloudinary";
 
-// Configuração do Cloudinary para o Furduncinho 047
+// Configuração do Cloudinary
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-// Utilitários de Geração
 function generateTicketCode(): string {
   const prefix = "FD047";
   const random = crypto.randomBytes(4).toString("hex").toUpperCase();
@@ -38,7 +37,6 @@ function generateQrHash(ticketId: number, userId: number): string {
   return crypto.createHash("sha256").update(data).digest("hex");
 }
 
-// Middleware de Proteção para Administradores (Sutter, Rodário, etc.)
 const adminProcedure = protectedProcedure.use(({ ctx, next }) => {
   if (ctx.user.role !== "admin") {
     throw new TRPCError({
@@ -70,7 +68,6 @@ export const appRouter = router({
             message: "Banco offline",
           });
 
-        // Validação de Duplicidade: E-mail ou CPF
         const existingUser = await dbInstance
           .select()
           .from(users)
@@ -112,8 +109,12 @@ export const appRouter = router({
           name: input.name,
         });
 
-        ctx.res.cookie(COOKIE_NAME, sessionToken, {
-          ...getSessionCookieOptions(ctx.req),
+        // FIX VERCEL: Cast para any para reconhecer .cookie
+        const res = ctx.res as any;
+        const req = ctx.req as any;
+
+        res.cookie(COOKIE_NAME, sessionToken, {
+          ...getSessionCookieOptions(req),
           maxAge: ONE_YEAR_MS,
         });
 
@@ -141,8 +142,12 @@ export const appRouter = router({
           name: user.name || "User",
         });
 
-        ctx.res.cookie(COOKIE_NAME, sessionToken, {
-          ...getSessionCookieOptions(ctx.req),
+        // FIX VERCEL: Cast para any
+        const res = ctx.res as any;
+        const req = ctx.req as any;
+
+        res.cookie(COOKIE_NAME, sessionToken, {
+          ...getSessionCookieOptions(req),
           maxAge: ONE_YEAR_MS,
         });
 
@@ -152,8 +157,12 @@ export const appRouter = router({
     me: publicProcedure.query(opts => opts.ctx.user),
 
     logout: publicProcedure.mutation(({ ctx }) => {
-      const cookieOptions = getSessionCookieOptions(ctx.req);
-      ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions });
+      // FIX VERCEL: Cast para any
+      const res = ctx.res as any;
+      const req = ctx.req as any;
+
+      const cookieOptions = getSessionCookieOptions(req);
+      res.clearCookie(COOKIE_NAME, { ...cookieOptions });
       return { success: true };
     }),
   }),
@@ -220,7 +229,6 @@ export const appRouter = router({
         const ticket = await db.getTicketById(input.ticketId);
         if (!ticket) throw new TRPCError({ code: "BAD_REQUEST" });
 
-        // Upload Organizado: Vai para a pasta 'comprovantes'
         const upload = await cloudinary.uploader.upload(
           `data:${input.proofMimeType};base64,${input.proofData}`,
           { folder: "furduncinho/comprovantes" }
@@ -267,7 +275,6 @@ export const appRouter = router({
         const qrHash = generateQrHash(ticket.id, ticket.userId);
         const qrDataUrl = await QRCode.toDataURL(qrHash);
 
-        // Upload Organizado: Vai para a pasta 'qrcodes'
         const upload = await cloudinary.uploader.upload(qrDataUrl, {
           folder: "furduncinho/qrcodes",
         });
@@ -351,7 +358,6 @@ export const appRouter = router({
         sql`TRUNCATE TABLE checkin_logs, payments, tickets RESTART IDENTITY CASCADE`
       );
 
-      // Remove usuários comuns mas mantém a equipe admin (Sutter, etc.)
       await dbInstance.delete(users).where(not(eq(users.role, "admin")));
 
       return { success: true };

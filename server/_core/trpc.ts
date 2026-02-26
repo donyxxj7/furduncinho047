@@ -2,6 +2,7 @@ import { initTRPC, TRPCError } from "@trpc/server";
 import { type Context } from "./context.js"; // ADICIONADO .js
 import superjson from "superjson";
 import { ZodError } from "zod";
+import { Request, Response } from "express";
 
 const t = initTRPC.context<Context>().create({
   transformer: superjson,
@@ -19,6 +20,11 @@ const t = initTRPC.context<Context>().create({
 
 export const router = t.router;
 export const publicProcedure = t.procedure;
+
+export interface CreateContextOptions {
+  req: Request;
+  res: Response;
+}
 
 export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
   if (!ctx.user) {
