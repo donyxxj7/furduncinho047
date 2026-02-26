@@ -7,14 +7,6 @@ import superjson from "superjson";
 import App from "./App";
 import "./index.css";
 
-// client/src/main.tsx
-
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch(console.error);
-  });
-}
-
 const queryClient = new QueryClient();
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
