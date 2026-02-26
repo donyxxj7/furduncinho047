@@ -9,9 +9,10 @@ import "./index.css";
 
 // client/src/main.tsx
 
-if (import.meta.env.DEV) {
-  // se você quiser manter só no dev
-  navigator.serviceWorker?.register("/sw.js").catch(console.error);
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/sw.js").catch(console.error);
+  });
 }
 
 const queryClient = new QueryClient();
