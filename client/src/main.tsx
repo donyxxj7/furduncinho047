@@ -7,23 +7,12 @@ import superjson from "superjson";
 import App from "./App";
 import "./index.css";
 
-// --- PWA REGISTRATION ---
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker
-      .register("/sw.js")
-      .then(registration => {
-        console.log(
-          "PWA: Service Worker registrado com sucesso:",
-          registration.scope
-        );
-      })
-      .catch(error => {
-        console.log("PWA: Falha ao registrar Service Worker:", error);
-      });
-  });
+// client/src/main.tsx
+
+if (import.meta.env.DEV) {
+  // se você quiser manter só no dev
+  navigator.serviceWorker?.register("/sw.js").catch(console.error);
 }
-// ------------------------
 
 const queryClient = new QueryClient();
 
