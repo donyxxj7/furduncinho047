@@ -1,4 +1,4 @@
-import type { CookieOptions, Request } from "express";
+import type { CookieOptions } from "express";
 
 const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
@@ -8,27 +8,25 @@ function isIpAddress(host: string | undefined) {
   return host.includes(":");
 }
 
-function isSecureRequest(req: Request) {
-  // @ts-ignore - Força a leitura do protocol se o TS reclamar na Vercel
+function isSecureRequest(req: any) {
+  // Usamos 'any' aqui para evitar o erro de protocolo/headers na Vercel
   if (req.protocol === "https") return true;
 
-  const forwardedProto = req.headers["x-forwarded-proto"];
+  const forwardedProto = req.headers?.["x-forwarded-proto"];
   if (!forwardedProto) return false;
 
   const protoList = Array.isArray(forwardedProto)
     ? forwardedProto
     : forwardedProto.split(",");
 
-  // Tipagem explícita (proto: string) resolve o erro TS7006
   return protoList.some(
     (proto: string) => proto.trim().toLowerCase() === "https"
   );
 }
 
 export function getSessionCookieOptions(
-  req: any // Trocamos Request por any aqui para matar os erros de uma vez
-): any {
-  // Retorno any para evitar o erro de constraint 'never'
+  req: any // Forçamos 'any' no parâmetro para matar o erro TS2339
+): Pick<CookieOptions, "domain" | "httpOnly" | "path" | "sameSite" | "secure"> {
   const hostname = req.hostname || "localhost";
   const isLocal = LOCAL_HOSTS.has(hostname) || isIpAddress(hostname);
   const isReqSecure = isSecureRequest(req);
