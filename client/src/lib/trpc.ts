@@ -1,5 +1,5 @@
 import { createTRPCReact } from "@trpc/react-query";
-import type { AppRouter } from "../../../server/routers.js";
+import type { AppRouter } from "../../../server/routers";
 import { httpBatchLink } from "@trpc/client";
 import superjson from "superjson"; // Importe o superjson
 

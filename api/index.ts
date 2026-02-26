@@ -2,10 +2,10 @@ import express from "express";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { appRouter } from "../server/routers.js";
-import { createContext } from "../server/_core/context.js";
 
-process.env.NODE_ENV = "production";
+// ⚠️ IMPORTANTE: sem ".js" aqui
+import { appRouter } from "../server/routers";
+import { createContext } from "../server/_core/context";
 
 const app = express();
 
@@ -32,6 +32,7 @@ app.use(
   })
 );
 
-export default app;
-
-// Final force update: 002
+// ✅ handler compatível com Serverless (Vercel chama (req,res))
+export default function handler(req: any, res: any) {
+  return app(req, res);
+}
