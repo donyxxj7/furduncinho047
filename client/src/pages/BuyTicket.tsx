@@ -23,6 +23,8 @@ import {
   UploadCloud,
   MessageCircle,
   Loader2,
+  Beer,
+  Check,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { toast } from "sonner";
@@ -48,7 +50,6 @@ export default function BuyTicket() {
   const [isSuccessOpen, setIsSuccessOpen] = useState(false);
   const [includeCooler, setIncludeCooler] = useState(false);
 
-  // Utilitário para limpar o cache após criar um ingresso
   const utils = trpc.useUtils();
 
   const selectedAdmin = useMemo(() => {
@@ -66,22 +67,24 @@ export default function BuyTicket() {
     onSuccess: async data => {
       if (data.success && data.ticketId) {
         setCreatedTicketId(data.ticketId);
-        // Atualiza o cache para o sistema saber que agora existe um ingresso
         await utils.tickets.myTickets.invalidate();
         setIsSuccessOpen(true);
         toast.success("Pedido gerado! Anexe o comprovante.");
       }
     },
-    onError: error => {
-      toast.error(error.message || "Erro ao criar ingresso");
-    },
+    onError: error => toast.error(error.message || "Erro ao criar ingresso"),
   });
 
-  const precoBase = settings?.priceNormal ?? 3000;
-  const precoCooler = settings?.priceCooler ?? 7000;
+  // LÓGICA DINÂMICA DO BANCO AQUI
+  const precoBase = settings?.priceNormal ?? 2500;
+  const precoCooler = settings?.priceCooler ?? 1500;
   const taxaServico = settings?.serviceFee ?? 0;
+  const isCoolerAllowed = settings?.allowCooler ?? true;
+
   const totalEmCentavos =
-    precoBase + taxaServico + (includeCooler ? precoCooler : 0);
+    precoBase +
+    taxaServico +
+    (includeCooler && isCoolerAllowed ? precoCooler : 0);
   const totalAmount = totalEmCentavos / 100;
 
   if (authLoading || ticketsLoading || settingsLoading) {
@@ -92,30 +95,6 @@ export default function BuyTicket() {
     );
   }
 
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-black flex items-center justify-center p-4">
-        <Card className="max-w-md w-full bg-black/40 border-white/10 text-white backdrop-blur-xl">
-          <CardHeader>
-            <CardTitle>Faça Login</CardTitle>
-            <CardDescription className="text-gray-400">
-              Você precisa estar logado para comprar.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button
-              asChild
-              className="w-full bg-purple-600 hover:bg-purple-500 font-bold h-12"
-            >
-              <Link href="/login">Entrar na Conta</Link>
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  // Verifica se o cara já tem boleto/pix pendente ou pago
   const existingTicket = tickets?.find(
     t => t.status === "pending" || t.status === "paid"
   );
@@ -123,7 +102,7 @@ export default function BuyTicket() {
   const handleCreateTicket = () => {
     if (existingTicket) {
       toast.error("Você já possui um pedido em andamento!");
-      setLocation("/meus-ingressos");
+      setLocation(`/suporte?id=${existingTicket.id}`);
       return;
     }
     createTicketMutation.mutate({ hasCooler: includeCooler });
@@ -163,134 +142,126 @@ export default function BuyTicket() {
       </header>
 
       <div className="container mx-auto px-4 py-12 relative z-10">
-        <div className="max-w-2xl mx-auto">
-          <h2 className="text-3xl font-black mb-8 text-center uppercase tracking-tighter">
-            Garantir Ingresso
+        <div className="max-w-md mx-auto">
+          <h2 className="text-2xl font-black mb-8 text-center uppercase tracking-tighter">
+            GARANTIR INGRESSO
           </h2>
 
-          {existingTicket ? (
-            <Card className="bg-white/5 border-purple-500/50 backdrop-blur-xl">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-white">
-                  <CheckCircle2 className="h-6 w-6 text-yellow-500" /> Pedido em
-                  Aberto
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-gray-400 mb-4">
-                  Você já iniciou uma compra. Finalize o envio do comprovante
-                  para validar.
-                </p>
-                <Button
-                  onClick={() => setLocation("/meus-ingressos")}
-                  className="w-full bg-purple-600 hover:bg-purple-500 h-12"
-                >
-                  Ver Meu Ingresso Ativo
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <>
-              {/* Resumo */}
-              <Card className="bg-white/5 border-white/10 mb-6">
-                <CardContent className="pt-6 space-y-4">
-                  <div className="flex justify-between border-b border-white/10 pb-3">
-                    <span className="text-gray-400 font-bold uppercase text-xs">
-                      Valor do Ingresso
-                    </span>
-                    <span className="font-bold">
-                      R$ {(precoBase / 100).toFixed(2).replace(".", ",")}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-lg font-bold">Total a Pagar</span>
-                    <span className="text-4xl font-black text-purple-400">
-                      R$ {totalAmount.toFixed(2).replace(".", ",")}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* PIX INFO */}
-              <div className="bg-purple-600/10 border border-purple-500/30 p-6 rounded-xl mb-6 text-center">
-                <p className="text-xs text-purple-300 uppercase font-bold mb-2">
-                  Chave PIX {PIX_INFO.banco}
-                </p>
-                <code className="text-xl font-mono block mb-3">
-                  {PIX_INFO.chave}
-                </code>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    navigator.clipboard.writeText(PIX_INFO.chave);
-                    toast.success("Copiado!");
-                  }}
-                  className="border-purple-500/50 hover:bg-purple-500/20"
-                >
-                  <Copy className="h-4 w-4 mr-2" /> Copiar Chave
-                </Button>
+          {/* CARD DE RESUMO - DESIGN MANTIDO */}
+          <Card className="bg-zinc-900/40 border-white/5 mb-6">
+            <CardContent className="pt-6 space-y-4">
+              <div className="flex justify-between border-b border-white/5 pb-3">
+                <span className="text-[10px] text-zinc-500 font-bold uppercase">
+                  Valor do Ingresso
+                </span>
+                <span className="text-sm font-bold">
+                  R$ {(precoBase / 100).toFixed(2).replace(".", ",")}
+                </span>
               </div>
 
-              <Button
-                className="w-full h-16 text-xl font-bold bg-green-600 hover:bg-green-500 text-white rounded-xl shadow-[0_0_20px_rgba(34,197,94,0.3)] transition-all"
-                onClick={handleCreateTicket}
-                disabled={createTicketMutation.isPending}
-              >
-                {createTicketMutation.isPending ? (
-                  <Loader2 className="animate-spin h-6 w-6" />
-                ) : (
-                  "JÁ FIZ O PIX, CONFIRMAR"
-                )}
-              </Button>
-            </>
-          )}
+              {/* CARD DE SELEÇÃO DO COOLER */}
+              {isCoolerAllowed && (
+                <div
+                  onClick={() => setIncludeCooler(!includeCooler)}
+                  className={`flex items-center justify-between p-3 rounded-lg border transition-all cursor-pointer ${
+                    includeCooler
+                      ? "border-purple-500/50 bg-purple-500/10"
+                      : "border-white/5 bg-white/5"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Beer
+                      size={16}
+                      className={
+                        includeCooler ? "text-purple-400" : "text-zinc-600"
+                      }
+                    />
+                    <span className="text-[10px] font-bold uppercase">
+                      Adicional Cooler
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] font-black text-purple-400">
+                      + R$ {(precoCooler / 100).toFixed(2)}
+                    </span>
+                    {includeCooler && (
+                      <Check size={12} className="text-purple-400" />
+                    )}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center">
+                <span className="text-sm font-bold">Total a Pagar</span>
+                <span className="text-4xl font-black text-purple-500">
+                  R$ {totalAmount.toFixed(2).replace(".", ",")}
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* CHAVE PIX NUBANK */}
+          <div className="bg-zinc-950/60 border border-purple-500/20 p-6 rounded-xl mb-6 text-center">
+            <p className="text-[10px] text-purple-400 font-bold uppercase mb-2">
+              Chave Pix Nubank
+            </p>
+            <p className="text-lg font-bold mb-4 tracking-tight">
+              {PIX_INFO.chave}
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                navigator.clipboard.writeText(PIX_INFO.chave);
+                toast.success("Copiado!");
+              }}
+              className="border-white/10 h-8 text-[10px] uppercase font-bold hover:bg-white hover:text-black transition-all"
+            >
+              <Copy className="h-3 w-3 mr-2" /> Copiar Chave
+            </Button>
+          </div>
+
+          <Button
+            className="w-full h-14 text-lg font-black bg-green-600 hover:bg-green-500 text-white rounded-lg shadow-lg active:scale-95 transition-all"
+            onClick={handleCreateTicket}
+            disabled={createTicketMutation.isPending}
+          >
+            {createTicketMutation.isPending ? (
+              <Loader2 className="animate-spin" />
+            ) : (
+              "JÁ FIZ O PIX, CONFIRMAR"
+            )}
+          </Button>
         </div>
       </div>
 
-      {/* MODAL DE SUCESSO - OBRIGATÓRIO REDIRECIONAR */}
       <Dialog
         open={isSuccessOpen}
         onOpenChange={open => {
-          if (!open) setLocation("/meus-ingressos"); // Se fechar o modal, vai pros ingressos
+          if (!open) setLocation(`/suporte?id=${createdTicketId}`);
           setIsSuccessOpen(open);
         }}
       >
-        <DialogContent className="bg-zinc-950 border-purple-500/50 text-white backdrop-blur-xl">
+        <DialogContent className="bg-zinc-950 border-purple-500/40 text-white">
           <DialogHeader className="text-center">
-            <CheckCircle2 className="h-16 w-16 text-green-500 mx-auto mb-4 animate-pulse" />
-            <DialogTitle className="text-2xl font-black">
+            <CheckCircle2 className="h-12 w-12 text-green-500 mx-auto mb-2" />
+            <DialogTitle className="text-xl font-black uppercase">
               PEDIDO #{createdTicketId} GERADO!
             </DialogTitle>
-            <DialogDescription className="text-gray-400 italic">
-              Não feche esta tela antes de anexar ou notificar.
-            </DialogDescription>
           </DialogHeader>
-
-          <div className="py-4 space-y-4">
+          <div className="space-y-3 pt-4">
             <Button
-              onClick={() =>
-                setLocation(`/enviar-comprovante/${createdTicketId}`)
-              }
-              className="w-full h-14 font-bold bg-purple-600 hover:bg-purple-700 text-white shadow-[0_0_15px_rgba(168,85,247,0.4)]"
+              onClick={() => setLocation(`/suporte?id=${createdTicketId}`)}
+              className="w-full h-12 font-bold bg-purple-600 hover:bg-purple-700"
             >
-              <UploadCloud className="mr-2 h-5 w-5" /> ANEXAR COMPROVANTE AGORA
+              <UploadCloud className="mr-2 h-4 w-4" /> ANEXAR COMPROVANTE
             </Button>
-
             <Button
               onClick={handleWhatsAppNotify}
-              className="w-full h-14 font-bold bg-[#25D366] hover:bg-[#20ba5a] text-black"
+              className="w-full h-12 font-bold bg-[#25D366] text-black"
             >
-              <MessageCircle className="mr-2 h-5 w-5" /> NOTIFICAR{" "}
+              <MessageCircle className="mr-2 h-4 w-4" /> NOTIFICAR{" "}
               {selectedAdmin?.nome.toUpperCase()}
-            </Button>
-
-            <Button
-              variant="ghost"
-              onClick={() => setLocation("/meus-ingressos")}
-              className="w-full text-zinc-500 hover:text-white"
-            >
-              Fazer isso mais tarde
             </Button>
           </div>
         </DialogContent>
